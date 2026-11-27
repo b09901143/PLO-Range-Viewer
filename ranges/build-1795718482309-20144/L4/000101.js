@@ -1,0 +1,1 @@
+window.PLOC_REGISTER("build-1795718482309-20144","EP:Fold|MP:Fold|CO:Pot|BTN:Fold|SB:Call|BB:Pot|CO:Pot|SB:Call|BB:All-in|CO:Fold>FOCUS:SB@L4",{"r":1,"keys":["Fold","Call"],"fe":-4550,"rows":[[1,1000,0,5219,0,48],[3,1000,0,-260,0,80],[5,585,0,-1883,0,41],[7,500,0,-10000,0,62],[90,1000,0,3528,0,23],[156,528,0,-3236,0,36]]});

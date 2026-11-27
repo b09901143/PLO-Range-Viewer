@@ -1,0 +1,1074 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PLOC Preflop Matrix V2 — Lazy Loading</title>
+<style>
+:root{
+  --bg:#0c0c0e; --panel:#161619; --panel-2:#1c1c20; --border:#2a2a30; --border-light:#3a3a42;
+  --text:#e8e8ec; --text-dim:#9a9aa2; --text-faint:#64646c;
+  /* 動作配色：藍=Fold、綠=Call、粉紅=Pot。要對調改這三行即可 */
+  --c-fold:#3d8bd8; --c-call:#04c07f; --c-pot:#ff8384; --c-allin:#ff4d4d;
+  --suit-s:#c9ccd4; --suit-h:#e5556b; --suit-d:#4a90e2; --suit-c:#3fbf6f;
+  --radius:7px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC",Roboto,Arial,sans-serif;font-size:12.5px;padding:8px;user-select:none;height:100vh;overflow:hidden}
+.app{max-width:1920px;margin:0 auto;height:100%;display:flex;flex-direction:column;gap:8px;min-height:0}
+
+/* ===== 頂部 ===== */
+.topbar{display:flex;gap:10px;align-items:stretch;flex:0 0 auto}
+.scenario{flex:0 0 290px;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:9px 12px}
+.scenario-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.scenario-head h2{font-size:15px;font-weight:600}
+.edit-icon{color:var(--text-faint);cursor:pointer}
+.tags{display:flex;flex-wrap:wrap;gap:5px 6px}
+.tag{background:var(--panel-2);border:1px solid var(--border);color:var(--text-dim);padding:2px 7px;border-radius:4px;font-size:11px;white-space:nowrap}
+.tree{display:flex;gap:6px;flex:1;overflow-x:auto;padding-bottom:4px}
+.pos-col{flex:0 0 106px;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:8px;display:flex;flex-direction:column;gap:6px;transition:border-color .12s,opacity .12s}
+.pos-col.preview{opacity:.65}.pos-col.preview:hover{opacity:1}
+.pos-col.focus{border-color:var(--c-call);box-shadow:0 0 0 1px var(--c-call)}
+.pos-head{display:flex;justify-content:space-between;font-size:13px;font-weight:600}
+.pos-head .stack{color:var(--text-dim);font-weight:500}
+.act-btns{display:flex;flex-direction:column;gap:4px}
+.act-btn{background:var(--panel-2);border:1px solid var(--border);color:var(--text-dim);padding:5px 0;border-radius:5px;font-size:12px;cursor:pointer;text-align:center;transition:.1s}
+.act-btn:hover{border-color:var(--border-light);color:var(--text)}
+.act-btn.sel-fold{background:var(--c-fold);border-color:var(--c-fold);color:#fff}
+.act-btn.sel-call{background:var(--c-call);border-color:var(--c-call);color:#07321c}
+.act-btn.sel-pot{background:var(--c-pot);border-color:var(--c-pot);color:#4a1420}
+
+/* ===== 主區 ===== */
+.main{display:flex;gap:10px;align-items:stretch;flex:1;min-height:0}
+.detail{flex:0 0 390px;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:10px;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+#comboArea{flex:1;min-height:0;display:flex;flex-direction:column}
+.detail-tools{display:flex;gap:8px;color:var(--text-faint);margin-bottom:8px}
+.freqbar{height:22px;border-radius:5px;overflow:hidden;display:flex;margin-bottom:6px;background:#111}
+.freqbar>div{height:100%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#0a0a0a;overflow:hidden;white-space:nowrap}
+.seg-fold{background:var(--c-fold);color:#dfeaff}.seg-call{background:var(--c-call)}.seg-pot{background:var(--c-pot)}
+.legend{display:flex;gap:12px;justify-content:flex-end;font-size:11px;color:var(--text-dim);margin-bottom:10px}
+.legend i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px}
+.detail-title{font-size:12px;color:var(--text-dim);margin-bottom:8px}
+.combo-head,.combo-row{display:grid;grid-template-columns:116px 1fr 46px 50px;gap:8px;align-items:center;padding-right:10px}
+.combo-head{color:var(--text-dim);font-size:11px;padding-bottom:6px;border-bottom:1px solid var(--border);margin-bottom:6px}
+.combo-row{padding:3px 0;font-size:12px}
+.combo-list{flex:1;min-height:0;overflow-y:auto}
+.cards{display:flex;gap:2px}
+.card{width:21px;height:25px;border-radius:3px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:700;font-size:11px;line-height:1;color:#fff;border:1px solid rgba(0,0,0,.45)}
+.card .suit{font-size:9px}
+/* 四色底：黑桃黑 / 紅心紅 / 梅花綠 / 方塊藍，白字 */
+.card.s{background:#20232b}.card.h{background:#d53a4e}.card.d{background:#2f73c4}.card.c{background:#2ba15d}
+.cbar{height:15px;background:#111;border-radius:3px;overflow:hidden;position:relative;display:flex}
+.cbar>div{height:100%}
+.cbar .lbl{position:absolute;inset:0;font-size:10px;color:#111;font-weight:700;text-align:center;line-height:15px}
+.num{text-align:right;font-variant-numeric:tabular-nums}
+.ev-pos{color:var(--c-call)}.ev-neg{color:var(--c-pot)}
+.empty-hint{color:var(--text-faint);font-size:12px;padding:24px 4px}
+
+/* ===== matrix / range 區 ===== */
+.center{flex:1;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:10px;display:flex;flex-direction:column;gap:8px;min-width:0;min-height:0}
+#viewArea{flex:1;min-height:0;display:flex;flex-direction:column;gap:8px}
+.ctop{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.view-toggle,.subview{display:flex;gap:2px;background:var(--panel-2);border:1px solid var(--border);border-radius:6px;padding:2px}
+.view-toggle button,.subview button{background:transparent;border:none;color:var(--text-dim);padding:4px 14px;border-radius:4px;cursor:pointer;font-size:12px}
+.view-toggle button.active,.subview button.active{background:var(--border-light);color:#fff}
+.toggles{display:flex;gap:16px;align-items:center;margin-left:auto}
+.tg{display:flex;align-items:center;gap:7px;cursor:pointer;color:var(--text-dim);font-size:12px}
+.sw{width:34px;height:18px;border-radius:9px;background:#333;position:relative;transition:.15s}
+.sw::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#bbb;transition:.15s}
+.tg.on .sw{background:var(--c-call)}.tg.on .sw::after{left:18px;background:#fff}
+.train-btn{background:var(--panel-2);border:1px solid var(--border);color:var(--text);padding:5px 14px;border-radius:6px;cursor:pointer;font-size:12px}
+
+.searchbar{display:flex;gap:8px;align-items:center}
+.searchbox{flex:1;display:flex;align-items:center;gap:8px;background:var(--panel-2);border:1px solid var(--border);border-radius:6px;padding:7px 10px}
+.searchbox input{flex:1;background:none;border:none;color:var(--text);outline:none;font-size:13px}
+.range-info{color:var(--text-dim);font-size:11px;white-space:nowrap}
+.filter-btn{background:var(--panel-2);border:1px solid var(--border);color:var(--text-dim);padding:7px 12px;border-radius:6px;cursor:pointer;font-size:12px}
+.filter-btn.active{color:#fff;border-color:var(--border-light)}
+
+/* matrix */
+.msub{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.ctiles{display:flex;gap:3px}
+.ctile{width:26px;height:30px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;background:#43434b;color:#2a2a2e}
+.ctile.fill{background:#e8e8ec;color:#111;box-shadow:0 0 0 2px #fff}
+.suit-mini{display:flex;gap:2px}.suit-mini i{width:15px;height:15px;border-radius:3px;display:block}
+.suit-mini i.on{background:#e8e8ec}.suit-mini i.off{background:#4a4a52}
+.pill{background:var(--panel-2);border:1px solid var(--border);color:var(--text-dim);padding:3px 10px;border-radius:5px;font-size:12px;cursor:pointer}
+.pill.active{background:#2f5a86;border-color:#3f6fa0;color:#fff}
+.hint{color:var(--text-faint);font-size:12px}
+.matrix-main{display:flex;gap:10px;flex:1;min-height:0}
+.grid{flex:1;display:grid;grid-template-columns:repeat(14,1fr);grid-template-rows:20px repeat(13,1fr);gap:1px;min-height:0}
+.gcell{border-radius:4px;position:relative;overflow:hidden;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#eef2f8;border:1px solid transparent;min-height:0}
+.gcell.hdr{background:transparent;color:var(--text-dim);cursor:default}
+.gcell.back{background:var(--panel-2);border:1px solid var(--border);color:var(--text)}
+.gcell.pair{border-color:rgba(255,255,255,.55)}
+.gcell.suited{border-color:rgba(255,255,255,.18)}
+.gcell.dead{background:#141417;cursor:default;color:#3a3a40}
+.gcell.active-cell{outline:2px solid #ffd54a;outline-offset:-1px;z-index:2}
+.gcell .segs{position:absolute;inset:0;display:flex}
+.gcell .segs>div{height:100%}
+.gcell .lab{position:relative;z-index:1}
+.gcell.pair .lab,.gcell.suited .lab{color:#111;text-shadow:none;font-weight:600;font-size:14.5px;letter-spacing:.3px}
+.suit-filter{flex:0 0 165px;display:flex;flex-direction:column;gap:6px;padding-top:2px}
+.suit-filter .ttl{color:var(--text-dim);font-size:12px;margin-bottom:4px}
+.sf-btn{background:var(--panel-2);border:1px solid var(--border);color:var(--text-dim);padding:8px 12px;border-radius:6px;cursor:pointer;font-size:12px;text-align:left}
+.sf-btn:hover{border-color:var(--border-light);color:var(--text)}
+.sf-btn.active{background:#2f5a86;border-color:#3f6fa0;color:#fff}
+
+/* range view */
+.range-cols{display:flex;gap:10px;align-items:stretch;flex:1;min-height:0}
+.rcol{flex:1;background:var(--panel-2);border:1px solid var(--border);border-radius:6px;overflow:hidden;min-width:0;display:flex;flex-direction:column}
+.rcol-head{padding:8px 12px;display:flex;justify-content:space-between;align-items:center;font-weight:600;color:#0d0d0d}
+.rcol-head .cnt{font-size:12px;opacity:.85}
+.rcol.fold .rcol-head{background:var(--c-fold);color:#eaf2ff}
+.rcol.call .rcol-head{background:var(--c-call)}
+.rcol.pot .rcol-head{background:var(--c-pot);color:#3a0f18}
+.rtable-head,.rrow{display:grid;gap:6px;align-items:center;padding:4px 10px;font-size:12px}
+.rtable-head{color:var(--text-dim);font-size:11px;border-bottom:1px solid var(--border)}
+.rh{cursor:pointer;user-select:none}.rh:hover{color:var(--text)}
+.rlist{flex:1;min-height:0;overflow-y:auto}
+.rrow:nth-child(odd){background:rgba(255,255,255,.015)}
+
+.footer-note{color:var(--text-faint);font-size:11px;margin-top:2px}
+
+/* filter modal */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:50}
+.modal-bg.show{display:flex}
+.modal{background:#1a1a1e;border:1px solid var(--border);border-radius:10px;width:560px;max-height:82vh;overflow-y:auto;padding:18px 20px}
+.modal h3{font-size:17px;margin-bottom:14px;display:flex;justify-content:space-between}
+.modal h3 .x{cursor:pointer;color:var(--text-dim)}
+.fsec{margin-bottom:16px}
+.frow{display:grid;grid-template-columns:70px 1fr;gap:12px;padding:6px 0;border-bottom:1px solid #222;font-size:12px}
+.ftok{background:#111;border:1px solid var(--border);border-radius:5px;padding:3px 6px;text-align:center;font-family:monospace;color:#cfd3dc;height:fit-content}
+.fdesc b{color:#fff}
+.fdesc small{color:var(--text-dim)}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- 頂部 -->
+  <div class="topbar">
+    <div class="scenario">
+      <div class="scenario-head"><h2>Select scenario</h2><span class="edit-icon">✎</span></div>
+      <div class="tags">
+        <span class="tag">Cash</span><span class="tag">Preflop</span><span class="tag">6-Max</span>
+        <span class="tag">GGPoker</span><span class="tag">100bb</span><span class="tag">Low Stakes</span>
+        <span class="tag">Classic</span><span class="tag">3.5x</span><span class="tag">5%, 2bb cap</span>
+      </div>
+    </div>
+    <div class="tree" id="tree"></div>
+  </div>
+
+  <!-- 主區 -->
+  <div class="main">
+    <!-- 左 detail -->
+    <div class="detail">
+      <div class="detail-tools"><span>⤢</span><span>⤡</span><span>↕</span></div>
+      <div class="freqbar" id="freqbar"></div>
+      <div class="legend" id="legend"></div>
+      <div class="detail-title" id="detailTitle">點 matrix 格子 → 進子 matrix → 點格子看 combo</div>
+      <div id="comboArea"><div class="empty-hint">尚未選取手牌。</div></div>
+    </div>
+
+    <!-- 中 center -->
+    <div class="center">
+      <div class="ctop">
+        <div class="view-toggle">
+          <button data-view="Range">Range</button>
+          <button data-view="Matrix" class="active">Matrix</button>
+        </div>
+        <div class="subview" id="subviewWrap" style="display:none">
+          <button data-sv="list" class="active">☰</button>
+          <button data-sv="grid">▦</button>
+        </div>
+        <div class="toggles">
+          <span id="rangeToggles" style="display:flex;gap:16px;align-items:center">
+            <div class="tg" data-tg="zero"><span class="sw"></span>0% Combos</div>
+            <div class="tg" data-tg="evpot"><span class="sw"></span>EV Pot%</div>
+            <div class="tg on" data-tg="evdiff"><span class="sw"></span>EV difference</div>
+          </span>
+          <span class="edit-icon">☆</span>
+          <button class="train-btn">▶ Train</button>
+        </div>
+      </div>
+
+      <div class="searchbar" id="searchbar">
+        <div class="searchbox">🔍<input id="search" placeholder="搜尋 combo / 類別，例如  AA  或  $ds:$B  或  !RR"></div>
+        <span class="range-info" id="rangeInfo">Range: 100.00%</span>
+        <button class="filter-btn" id="filterBtn">⚑ FILTER</button>
+      </div>
+
+      <div id="viewArea"></div>
+    </div>
+  </div>
+</div>
+
+<!-- filter 語法面板 -->
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <h3>Preflop Filters <span class="x" id="modalX">✕</span></h3>
+    <div id="filterRef"></div>
+  </div>
+</div>
+
+<script>
+/* ===========================================================================
+   PLOC Preflop Matrix
+   - 真實資料由 PLOC_data.js 設定 window.PLOC_DATA[lineKey]；無資料時 fallback 假資料
+   =========================================================================== */
+const RANKS=['A','K','Q','J','T','9','8','7','6','5','4','3','2'];
+const POS=['EP','MP','CO','BTN','SB','BB'];
+const BASE_STACK={EP:100,MP:100,CO:100,BTN:100,SB:99.5,BB:99};
+const LEVEL_BB=[0,3.5,12,38,100];   // 各加注層級已投入 bb（近似）
+
+const state={
+  choices:[],            // 已鎖定行動序列
+  view:'Matrix',
+  subview:'list',
+  matrixLevel:0,         // 0=頂層選最高兩張；1=子層選另外兩張
+  topCell:null,          // {hi,lo,pair}
+  activeSub:null,        // 子格 key（另外兩張）
+  subSuited:null,        // 子格 good/bad：true=good(右上), false=bad(左下), null=對角(對子)
+  suitBtns:new Set(),    // 花色 sidebar 選取（空=全部）
+  search:'',
+  tg:{zero:false,evpot:false,evdiff:true},
+  rsort:{col:'ev',dir:-1},   // range view 排序欄位 + 方向(-1=大到小,1=小到大)
+};
+function sortRange(col){const s=state.rsort;if(s.col===col)s.dir=-s.dir;else{s.col=col;s.dir=-1;}renderAll();}
+
+/* ---- 亂數（fallback 假資料用） ---- */
+function hashStr(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return h>>>0;}
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;}}
+function rngFor(seed){return mulberry32(hashStr(seed));}
+
+/* ===========================================================================
+   行動樹引擎
+   =========================================================================== */
+const STACK=100;                 // 每人起始碼
+const INV0=[0,0,0,0,0.5,1];       // EP,MP,CO,BTN,SB,BB 的初始投入（盲注）
+// 面對 highest 的動作標籤（size 動態、pot raise≥100→All-in）
+function actsFacing(seat,inv,highest,raises){
+  if(raises===0){                 // 尚無人加注（open 前）
+    if(seat===5)return['Check','Pot'];
+    if(seat===4)return['Fold','Call','Pot'];
+    return['Fold','Pot'];
+  }
+  if(highest>=STACK-1e-9)return['Fold','Call'];           // 已面對全下→只能 call/fold
+  const callAmt=highest-inv[seat];
+  const rawTO=highest+(inv.reduce((a,b)=>a+b,0)+callAmt); // pot raise TO
+  return['Fold','Call',rawTO>=STACK-1e-9?'All-in':'Pot'];
+}
+function computeNodes(choices){
+  const N=6, folded=Array(N).fill(false), acted=Array(N).fill(false);
+  const inv=INV0.slice();
+  let highest=1, raises=0, seat=0, guard=0;
+  const sum=()=>inv.reduce((a,b)=>a+b,0);
+  const nodes=[];
+  while(guard++<80){
+    let found=-1;
+    for(let k=0;k<N;k++){const s=(seat+k)%N;if(folded[s])continue;
+      if(inv[s]<highest-1e-9||(raises===0&&!acted[s])){found=s;break;}}
+    if(found===-1){return{nodes,focus:nodes.length,closed:true,inv:inv.slice(),highest,raises,folded:folded.slice()};}
+    seat=found;
+    const acts=actsFacing(seat,inv,highest,raises);
+    const chosen=choices[nodes.length];
+    const invBefore=inv[seat], potBefore=sum();
+    const node={seat,actions:acts,chosen,level:raises,invBefore,invAfter:invBefore,potBefore};
+    nodes.push(node);
+    if(chosen===undefined) return{nodes,focus:nodes.length-1,closed:false,inv:inv.slice(),highest,raises,folded:folded.slice()};
+    acted[seat]=true;
+    if(chosen==='Fold')folded[seat]=true;
+    else if(chosen==='Call'||chosen==='Check')inv[seat]=highest;
+    else{ // Pot / All-in = 加注
+      const callAmt=highest-inv[seat];
+      const rawTO=highest+(sum()+callAmt);
+      inv[seat]=Math.min(rawTO,STACK);highest=inv[seat];raises++;
+    }
+    node.invAfter=inv[seat];
+    seat=(seat+1)%N;
+  }
+  return{nodes,focus:nodes.length,closed:true,inv:inv.slice(),highest,raises};
+}
+function tree(){return computeNodes(state.choices);}
+function phase(){
+  const allFold=state.choices.every(c=>c==='Fold');
+  if(allFold&&state.choices.length<5)return{t:'open',foldedN:state.choices.length};
+  if(allFold&&state.choices.length>=5)return{t:'terminal'};
+  return{t:'seq'};
+}
+function activeNode(){if(phase().t==='terminal')return null;const t=tree();return t.closed?t.nodes[t.nodes.length-1]:t.nodes[t.focus];}
+function focusActions(){const n=activeNode();return n?n.actions:['Fold','Pot'];}
+function lineKey(){
+  const t=tree();
+  const locked=state.choices.map((a,i)=>POS[t.nodes[i].seat]+':'+a).join('|');
+  const n=activeNode();
+  return locked+'>FOCUS:'+(n?POS[n.seat]:'?')+'@L'+(n?n.level:0);
+}
+
+/* ---- 動作 → 色槽 / 資料鍵 ---- */
+function slotOf(a){if(a==='Fold')return'fold';if(a==='Call'||a==='Check')return'call';return'pot';}
+// 資料鍵:All-in 存成 'Pot'、Check 存成 'Call'(build 的 mapKeys)
+function dataKey(a){if(a==='Fold')return'Fold';if(a==='Call'||a==='Check')return'Call';return'Pot';}
+// 此節點的進攻動作名稱(Pot 或 All-in)、跟注名稱(Call 或 Check)
+function aggrName(){const a=focusActions();return a.includes('All-in')?'All-in':'Pot';}
+function callName(){const a=focusActions();return a.includes('Check')?'Check':'Call';}
+function colorOf(a){if(a==='All-in')return'var(--c-allin)';return'var(--c-'+slotOf(a)+')';}
+// 給資料鍵(Fold/Call/Pot)對應顏色:進攻鍵在 All-in 節點用 allin 色
+function colorForKey(k){if(k==='Fold')return'var(--c-fold)';if(k==='Call')return'var(--c-call)';return aggrName()==='All-in'?'var(--c-allin)':'var(--c-pot)';}
+// 資料鍵→顯示名稱(給此節點)
+function nameForKey(k){if(k==='Fold')return'Fold';if(k==='Call')return callName();return aggrName();}
+function nodeHasData(){return!!(window.PLOC_DATA&&window.PLOC_DATA[lineKey()]);}
+// 花色同構類別代表的實際 combo 數(與 build 的 rawCount 一致,用於加權)
+function rawCountOf(ranks4,suits4){const g={};ranks4.forEach((r,i)=>{(g[suits4[i]]=g[suits4[i]]||[]).push(r);});
+  const groups=Object.values(g).map(a=>a.slice().sort().join(''));let p=1;for(let k=0;k<groups.length;k++)p*=(4-k);
+  const c={};groups.forEach(k=>c[k]=(c[k]||0)+1);let sym=1;for(const k in c)for(let f=2;f<=c[k];f++)sym*=f;return p/sym;}
+
+/* ===========================================================================
+   花色 / 分組 helper（真實資料用）
+   =========================================================================== */
+// 花色結構簽章：每個花色分組裡有哪些 rank（花色relabel + 同rank互換都不變）→ 真正的「花色結構」
+function suitSig(c){const g={};c.ranks4.forEach((r,i)=>{(g[c.suits4[i]]=g[c.suits4[i]]||[]).push(r);});
+  return Object.values(g).map(a=>a.slice().sort((x,y)=>RANKS.indexOf(x)-RANKS.indexOf(y)).join('')).sort().join('|');}
+function dedupBySig(a){const s=new Set(),o=[];for(const c of a){const k=c.ranks4.join('')+'#'+suitSig(c);if(!s.has(k)){s.add(k);o.push(c);}}return o;}
+// good = 最高 rank 的牌與「不同 rank」的牌同花；
+// 例外：四張全不同 且 結構為「最高兩張同花 + 最低兩張同花」的 double（最差 double）→ bad
+function refSuitedOf(c){
+  const r=c.ranks4,s=c.suits4;
+  // 找最高 rank 的 index（RANKS 為降冪：rank 越大 index 越小）
+  let hiIdx=0;for(let i=1;i<4;i++)if(RANKS.indexOf(r[i])<RANKS.indexOf(r[hiIdx]))hiIdx=i;
+  const R=r[hiIdx];
+  let good=false;
+  for(let i=0;i<4;i++){if(r[i]!==R)continue;
+    for(let j=0;j<4;j++){if(j!==i&&r[j]!==R&&s[j]===s[i])good=true;}}
+  if(!good)return false;
+  // 例外：四張全不同 且「最高+次高同花、第三+最低同花」的最差 double → bad
+  if(new Set(r).size===4){
+    const ord=[0,1,2,3].sort((a,b)=>RANKS.indexOf(r[a])-RANKS.indexOf(r[b])); // ord[0]=最高張
+    if(s[ord[0]]===s[ord[1]]&&s[ord[2]]===s[ord[3]]&&s[ord[0]]!==s[ord[2]])return false;
+  }
+  return true;
+}
+function maxEVof(c){return Math.max.apply(null,Object.values(c.ev));}
+
+/* ===========================================================================
+   花色生成引擎（與抓到的資料無關：純組合列舉 → 同構去重 → 代表花色）
+   代表花色慣例：最高張盡量 = s，各花色分組依首次出現給 s/h/d/c
+   =========================================================================== */
+const SU4=['s','h','d','c'];
+const CAT_RANK={Double:0,Single:1,Trip:2,Monotone:3,Rainbow:4};
+function catFromSuits(suits4){
+  const cnt={};suits4.forEach(s=>cnt[s]=(cnt[s]||0)+1);
+  const v=Object.values(cnt).sort((a,b)=>b-a);
+  return v[0]===4?'Monotone':v[0]===3?'Trip':(v[0]===2&&v[1]===2)?'Double':v[0]===2?'Single':'Rainbow';
+}
+// 同構 key：rank 多重集 + 花色結構簽章（花色 relabel、同 rank 互換皆不變）
+function comboKey(ranks4,suits4){
+  const g={};ranks4.forEach((r,i)=>{(g[suits4[i]]=g[suits4[i]]||[]).push(r);});
+  const rk=ranks4.slice().sort((a,b)=>RANKS.indexOf(a)-RANKS.indexOf(b)).join(''); // 高→低
+  const sig=Object.values(g).map(a=>a.slice().sort((x,y)=>RANKS.indexOf(x)-RANKS.indexOf(y)).join('')).sort().join('|');
+  return rk+'#'+sig;
+}
+// 給定 4 個 rank（由高到低、可含重複）→ 所有花色同構類別（含代表花色）
+const suitClassCache=new Map();
+function genSuitClasses(ranksDesc){
+  const cacheKey=ranksDesc.join('');if(suitClassCache.has(cacheKey))return suitClassCache.get(cacheKey);
+  const out=[],seen=new Set();
+  const rec=(i,suits)=>{
+    if(i===4){
+      const cards=ranksDesc.map((r,k)=>r+suits[k]);
+      if(new Set(cards).size<4)return;            // 四張不可重複（同 rank 不可同花）
+      const key=comboKey(ranksDesc,suits);
+      if(seen.has(key))return;seen.add(key);
+      out.push({ranks4:ranksDesc.slice(),suits4:suits.slice(),cat:catFromSuits(suits)});
+      return;
+    }
+    for(let s=0;s<4;s++)rec(i+1,suits.concat(SU4[s]));
+  };
+  rec(0,[]);
+  suitClassCache.set(cacheKey,out);return out;
+}
+// 抓到的資料索引：comboKey → real combo（freq/EV）
+const poolIdxCache=new Map();
+function poolIndex(){
+  const lk=lineKey();
+  if(poolIdxCache.has(lk))return poolIdxCache.get(lk);
+  const idx=new Map();
+  if(window.PLOC_DATA&&window.PLOC_DATA[lk]){
+    window.PLOC_DATA[lk].combos.forEach(c=>{const k=comboKey(c.ranks4,c.suits4);if(!idx.has(k))idx.set(k,c);});
+  }
+  poolIdxCache.set(lk,idx);
+  return idx;
+}
+// 某頂層格（hi,lo）的所有子 combo：列舉「另外兩張 ≤ lo」→ 每格花色類別 → 疊上真實 freq/EV（配不到=100% fold）
+const cellCache=new Map();
+function genCellCombos(hi,lo,pair){
+  const lk=lineKey();const ck=lk+'|'+hi+lo+(pair?'=':'-');
+  if(cellCache.has(ck))return cellCache.get(ck);
+  const idx=poolIndex();
+  const _t=tree();const _fn=_t.closed?-1:_t.focus;const _fs=_fn>=0?_t.nodes[_fn].seat:-1;
+  const foldEVdef=_fs>=0?-(_t.inv[_fs]||0):0; // 缺資料時的蓋牌 EV = -死錢
+  // 受限節點:行動者之前已在這條線行動過 → 範圍受限,範圍外的 combo 不顯示(黑)
+  const restricted=_fs>=0&&_t.nodes.slice(0,_fn).some(n=>n.seat===_fs);
+  const cap=RANKS.indexOf(pair?hi:lo);            // RANKS 降冪：另外兩張 rank ≤ lo ⇔ index ≥ cap
+  const out=[];
+  for(let ai=cap;ai<13;ai++)for(let bi=ai;bi<13;bi++){
+    const ranksDesc=[hi,lo,RANKS[ai],RANKS[bi]].sort((x,y)=>RANKS.indexOf(x)-RANKS.indexOf(y)); // 高→低
+    genSuitClasses(ranksDesc).forEach(cl=>{
+      const r4=cl.ranks4,s4=cl.suits4;
+      const real=idx.get(comboKey(r4,s4));
+      if(!real&&restricted)return;   // 受限節點:不在範圍內 → 不顯示
+      const base={hi:r4[0],lo:r4[1],r3:r4[2],r4:r4[3],ranks4:r4,suits4:s4,cat:cl.cat,
+        suitedHiLo:s4[0]===s4[r4.lastIndexOf(r4[1])],
+        hiSuited:s4.slice(1).includes(s4[0]),wt:rawCountOf(r4,s4),reach:1};
+      if(real){base.freqs=real.freqs;base.ev=real.ev;base.evdiff=real.evdiff;if(real.wt)base.wt=real.wt;if(real.reach!=null)base.reach=real.reach;}
+      else{base.freqs={Fold:1};base.ev={Fold:foldEVdef};base.evdiff={Fold:0};} // 非受限且無資料 = 100% fold(壓縮省略的蓋牌手)
+      out.push(base);
+    });
+  }
+  cellCache.set(ck,out);
+  return out;
+}
+
+/* ===========================================================================
+   combo 產生（fallback 假資料）
+   =========================================================================== */
+function rankScore(r){return(12-RANKS.indexOf(r))/12;}
+function cellStrength(hi,lo,pair){
+  let s=rankScore(hi)*0.65+rankScore(lo)*0.45;
+  if(pair)s+=0.22;
+  const gap=Math.abs(RANKS.indexOf(hi)-RANKS.indexOf(lo));
+  if(gap<=4)s+=0.05;
+  return Math.max(0,Math.min(1,s));
+}
+const SUITS=['s','h','d','c'], SUIT_SYM={s:'♠',h:'♥',d:'♦',c:'♣'};
+function pickDistinct(rnd,n){const a=SUITS.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(rnd()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a.slice(0,n);}
+const GROUPS={Double:[2,2],Single:[2,1,1],Trip:[3,1],Monotone:[4],Rainbow:[1,1,1,1]};
+function assignSuits(rnd,cat,hiSuited){
+  const sizes=GROUPS[cat].slice();
+  sizes.sort((a,b)=>hiSuited?b-a:a-b);
+  const suitPool=pickDistinct(rnd,sizes.length);
+  const suits=[];
+  sizes.forEach((sz,i)=>{for(let k=0;k<sz;k++)suits.push(suitPool[i]);});
+  return suits;
+}
+const CATS=['Single','Double','Trip','Monotone','Rainbow'];
+const CAT_W={Single:0.46,Double:0.24,Rainbow:0.18,Trip:0.09,Monotone:0.03};
+function pickCat(rnd){let x=rnd(),acc=0;for(const c of CATS){acc+=CAT_W[c];if(x<=acc)return c;}return'Single';}
+function evForAction(strength,a,rnd){
+  const n=(rnd()-0.5)*1.4;
+  if(a==='Fold')return 0;
+  if(a==='Check')return +((strength-0.35)*5+n).toFixed(2);
+  if(a==='Call')return +((strength-0.52)*8+n).toFixed(2);
+  return +((strength-0.48)*14+n*1.4).toFixed(2);
+}
+function makeCombo(seed,hi,lo,r3,r4,cat,hiSuitedTarget,actions){
+  const rnd=rngFor(seed);
+  const ranks4=[hi,lo,r3,r4].sort((a,b)=>RANKS.indexOf(a)-RANKS.indexOf(b));
+  const suits4=assignSuits(rnd,cat,hiSuitedTarget);
+  const strength=cellStrength(hi,lo,hi===lo);
+  const ev={}; actions.forEach(a=>ev[a]=evForAction(strength,a,rnd));
+  const sorted=[...actions].sort((a,b)=>ev[b]-ev[a]);
+  const freqs={}; actions.forEach(a=>freqs[a]=0);
+  const gap=ev[sorted[0]]-(ev[sorted[1]]??-99);
+  if(gap>1.1){freqs[sorted[0]]=1;}
+  else{
+    const mx=ev[sorted[0]];let tot=0;const w={};
+    actions.forEach(a=>{w[a]=Math.exp((ev[a]-mx)*1.3);tot+=w[a];});
+    actions.forEach(a=>{let f=w[a]/tot;freqs[a]=f<0.04?0:f;});
+    let s2=0;actions.forEach(a=>s2+=freqs[a]);actions.forEach(a=>freqs[a]=+(freqs[a]/s2).toFixed(2));
+  }
+  const evdiff={};actions.forEach(a=>{const others=actions.filter(x=>x!==a).map(x=>ev[x]);evdiff[a]=+(ev[a]-Math.max(...others)).toFixed(2);});
+  const posLo=ranks4.lastIndexOf(lo);
+  const suitedHiLo=suits4[0]===suits4[posLo];
+  const hiSuited=suits4.slice(1).includes(suits4[0]);
+  return{hi,lo,r3,r4,ranks4,suits4,cat,ev,freqs,evdiff,suitedHiLo,hiSuited,wt:1.00};
+}
+
+/* 全域 pool：由花色引擎列舉完整範圍(受限→範圍內;非受限→含壓縮省略的 fold)。
+   無真實資料(節點未建檔)→ 回傳空陣列,不再產生任何假資料。 */
+const poolCache=new Map();
+function getPool(){
+  const lk=lineKey();
+  if(poolCache.has(lk))return poolCache.get(lk);
+  if(!nodeHasData()){poolCache.set(lk,[]);return[];}
+  const pool=[];
+  for(let i=0;i<13;i++)for(let j=i;j<13;j++){
+    const hi=RANKS[i],lo=RANKS[j],pair=i===j;
+    genCellCombos(hi,lo,pair).forEach(c=>pool.push(c));
+  }
+  poolCache.set(lk,pool);
+  return pool;
+}
+
+/* 單一頂層格的所有子 combo：真實資料直接從 pool 篩 hi/lo；
+   無真實資料的格子（open 節點）= 100% fold，本地列舉所有花色 combo（與原站一致，可點進去） */
+const SUB_VARIANTS=[['Double',true],['Single',true],['Trip',true],['Monotone',true],['Rainbow',false],['Single',false],['Trip',false]];
+function getSubCombos(hi,lo,pair){
+  // 一律用花色生成引擎：花色組合/good-bad/另外兩張範圍皆為純組合正確，freq/EV 疊真實資料
+  return genCellCombos(hi,lo,pair);
+}
+/* 本地列舉某最高兩張的所有 4-card 花色 combo（去重），全部標 100% fold */
+const foldGenCache=new Map();
+function genFoldCombos(hi,lo,pair){
+  const ck=hi+lo+(pair?'=':'-');
+  if(foldGenCache.has(ck))return foldGenCache.get(ck);
+  const SU=['s','h','d','c'];
+  const lowIdx=pair?RANKS.indexOf(hi):RANKS.indexOf(lo);
+  const out=[],seen=new Set();
+  for(let ai=lowIdx;ai<13;ai++)for(let bi=ai;bi<13;bi++){
+    const r3=RANKS[ai],r4=RANKS[bi];
+    for(let s0=0;s0<4;s0++)for(let s1=0;s1<4;s1++)for(let s2=0;s2<4;s2++)for(let s3=0;s3<4;s3++){
+      const cards=[[hi,s0],[lo,s1],[r3,s2],[r4,s3]];
+      if(new Set(cards.map(c=>c[0]+c[1])).size<4)continue; // 四張不重複
+      cards.sort((p,q)=>RANKS.indexOf(p[0])-RANKS.indexOf(q[0])||p[1]-q[1]);
+      const ranks4=cards.map(c=>c[0]),suits4=cards.map(c=>SU[c[1]]);
+      if(ranks4[0]!==hi||ranks4[1]!==lo)continue; // 確保最高兩張正確
+      const m={};let n=0;const pat=suits4.map(s=>(s in m)?m[s]:(m[s]=n++)).join('');
+      const key=ranks4.join('')+'|'+pat;
+      if(seen.has(key))continue;seen.add(key);
+      const cnt={};suits4.forEach(s=>cnt[s]=(cnt[s]||0)+1);
+      const v=Object.values(cnt).sort((a,b)=>b-a);
+      const cat=v[0]===4?'Monotone':v[0]===3?'Trip':(v[0]===2&&v[1]===2)?'Double':v[0]===2?'Single':'Rainbow';
+      out.push({hi,lo,r3,r4,ranks4,suits4,cat,
+        freqs:{Fold:1,Pot:0}, ev:{Fold:0,Pot:0}, evdiff:{Fold:0,Pot:0},
+        suitedHiLo:suits4[0]===suits4[ranks4.lastIndexOf(lo)],
+        hiSuited:suits4.slice(1).includes(suits4[0]), wt:1});
+    }
+  }
+  foldGenCache.set(ck,out);
+  return out;
+}
+
+/* ===========================================================================
+   filter / search 解析（子集）
+   =========================================================================== */
+const BROADWAY=['A','K','Q','J','T'],MIDDLE=['9','8','7','6'],LOW=['5','4','3','2'];
+function catToken(combo,tok){
+  const c=combo.cat;
+  if(tok==='$ss')return c==='Single';
+  if(tok==='$ds')return c==='Double';
+  if(tok==='$ts')return c==='Trip';
+  if(tok==='$ms')return c==='Monotone';
+  if(tok==='$rb')return c==='Rainbow';
+  return null;
+}
+function countRanks(combo){const m={};combo.ranks4.forEach(r=>m[r]=(m[r]||0)+1);return m;}
+function matchToken(combo,tokRaw){
+  const tok=tokRaw.trim();if(!tok)return true;
+  const counts=countRanks(combo);
+  const pairs=Object.values(counts).filter(v=>v>=2).length;
+  if(tok==='RR')return pairs>=1;
+  if(tok==='RROO')return pairs>=2;
+  if(tok==='$np')return pairs===0;
+  if(tok==='$B')return combo.ranks4.some(r=>BROADWAY.includes(r));
+  if(tok==='$M')return combo.ranks4.some(r=>MIDDLE.includes(r));
+  if(tok==='$L')return combo.ranks4.some(r=>LOW.includes(r));
+  const ct=catToken(combo,tok);if(ct!==null)return ct;
+  // Rxx:某 rank 與他牌同花(x 數不限)
+  let m=tok.match(/^([AKQJT2-9])(x+)$/i);
+  if(m){const R=m[1].toUpperCase();const idx=combo.ranks4.indexOf(R);if(idx<0)return false;
+    return combo.suits4.filter((s,i)=>i!==idx).includes(combo.suits4[idx]);}
+  // 指定花色的單張 e.g. As Kh 9s(rank+花色)
+  m=tok.match(/^([AKQJT2-9])([cdhs])$/i);
+  if(m){const R=m[1].toUpperCase(),S=m[2].toLowerCase();return combo.ranks4.some((r,i)=>r===R&&combo.suits4[i]===S);}
+  // 單一花色
+  if(/^[cdhs]$/.test(tok))return combo.suits4.includes(tok);
+  // 多 rank token:A / AA / AAK / AKQJ / AKQJT — 需包含這些 rank(含重複次數)
+  if(/^[AKQJT2-9]+$/i.test(tok)){
+    const need={};tok.toUpperCase().split('').forEach(r=>need[r]=(need[r]||0)+1);
+    return Object.keys(need).every(r=>(counts[r]||0)>=need[r]);
+  }
+  return false;   // 無法識別的 token → 不匹配(不再一律回傳 true)
+}
+function buildPredicate(expr){
+  const s=expr.trim();if(!s)return null;
+  const toks=[];const re=/\s*([(),:!]|[^\s(),:!]+)\s*/g;let m;
+  while((m=re.exec(s))!==null)toks.push(m[1]);
+  let p=0;
+  function peek(){return toks[p];}
+  function eat(){return toks[p++];}
+  function parseOr(){let l=parseAnd();while(peek()===','){eat();const r=parseAnd();const a=l,b=r;l=c=>a(c)||b(c);}return l;}
+  function parseAnd(){let l=parseNot();while(peek()&&peek()!==','&&peek()!==')'){if(peek()===':')eat();const r=parseNot();const a=l,b=r;l=c=>a(c)&&b(c);}return l;}
+  function parseNot(){if(peek()==='!'){eat();const inner=parseNot();return c=>!inner(c);}return parsePrim();}
+  function parsePrim(){
+    if(peek()==='('){eat();const e=parseOr();if(peek()===')')eat();return e;}
+    const t=eat();if(t===undefined)return()=>true;return c=>matchToken(c,t);
+  }
+  try{const fn=parseOr();return fn;}catch(e){return null;}
+}
+function predicate(){
+  const searchPred=buildPredicate(state.search);
+  const cats=activeCats();
+  const useSearch=state.view==='Range';
+  return function(combo){
+    if(cats&&!cats.has(combo.cat))return false;
+    if(useSearch&&searchPred&&!searchPred(combo))return false;
+    return true;
+  };
+}
+function activeCats(){
+  if(state.suitBtns.size===0)return null;
+  const set=new Set();
+  state.suitBtns.forEach(b=>{
+    if(b==='Single Suited')set.add('Single');
+    if(b==='Double Suited')set.add('Double');
+    if(b==='Trip Suited')set.add('Trip');
+    if(b==='Monotone / Rainbow'){set.add('Monotone');set.add('Rainbow');}
+  });
+  return set;
+}
+
+/* ===========================================================================
+   聚合
+   =========================================================================== */
+function aggSlots(combos){
+  // 依「實際 combo 數 × reach(入池機率)」加權;非受限 reach=1
+  const slot={fold:0,call:0,pot:0};let w=0;
+  combos.forEach(c=>{const wt=(c.wt||1)*(c.reach==null?1:c.reach);for(const a in c.freqs){slot[slotOf(a)]+=c.freqs[a]*wt;}w+=wt;});
+  if(w<=1e-9)return{fold:0,call:0,pot:0,empty:true};
+  return{fold:slot.fold/w,call:slot.call/w,pot:slot.pot/w,empty:false};
+}
+
+/* ===========================================================================
+   渲染：行動樹
+   =========================================================================== */
+// Preview actual sequential fold branches, including action wrapping to earlier seats.
+function foldPreviews(choices){
+  const out=[];let seq=choices.slice();
+  for(let guard=0;guard<6;guard++){
+    const t=computeNodes(seq);
+    if(t.closed||!t.nodes[t.focus].actions.includes('Fold'))break;
+    seq=seq.concat('Fold');
+    if(seq.length>=5&&seq.every(a=>a==='Fold'))break;
+    const next=computeNodes(seq);
+    if(next.closed)break;
+    const n=next.nodes[next.focus];
+    const key=seq.map((a,i)=>POS[next.nodes[i].seat]+':'+a).join('|')+'>FOCUS:'+POS[n.seat]+'@L'+n.level;
+    if(window.PLOC_INDEX?.spots&&!Object.prototype.hasOwnProperty.call(window.PLOC_INDEX.spots,key))break;
+    out.push({node:n,choices:seq.slice()});
+  }
+  return out;
+}
+function selectPreview(seq,act){
+  state.choices=act===undefined?seq.slice():seq.concat(act);
+  resetSel();renderAll();
+}
+function renderTree(){
+  const el=document.getElementById('tree');el.innerHTML='';
+  const t=tree(),terminal=phase().t==='terminal';
+  t.nodes.forEach((node,i)=>{
+    if(terminal&&i>=state.choices.length)return;
+    const isFocus=!terminal&&!t.closed&&i===t.focus;
+    appendCol(el,node.seat,STACK-node.invAfter,node.actions,act=>chooseAction(i,act),isFocus,node.chosen,()=>focusNode(i));
+  });
+  if(!terminal&&!t.closed){
+    for(const {node,choices} of foldPreviews(state.choices)){
+      appendCol(el,node.seat,STACK-node.invBefore,node.actions,act=>selectPreview(choices,act),false,undefined,()=>selectPreview(choices));
+      el.lastChild.classList.add('preview');
+    }
+  }
+}
+function appendCol(el,seat,stackBB,actions,onClick,focus,chosen,onHead){
+  const col=document.createElement('div');col.className='pos-col'+(focus?' focus':'');
+  if(onHead){col.style.cursor='pointer';col.title='檢視此位置的策略';col.onclick=onHead;}
+  const stack=stackBB;
+  const head=document.createElement('div');head.className='pos-head';
+  head.innerHTML=`<span>${POS[seat]}</span><span class="stack">${(+stack).toFixed(stack%1?1:0)}</span>`;
+  col.appendChild(head);
+  const btns=document.createElement('div');btns.className='act-btns';
+  actions.forEach(act=>{
+    const b=document.createElement('button');b.className='act-btn';b.textContent=act;
+    if(chosen===act&&!focus){b.classList.add('sel-'+slotOf(act));if(act==='All-in')b.style.background='var(--c-allin)';}
+    b.onclick=(e)=>{e.stopPropagation();onClick(act);};btns.appendChild(b);
+  });
+  col.appendChild(btns);el.appendChild(col);
+}
+function resetSel(){state.matrixLevel=0;state.topCell=null;state.activeSub=null;state.subSuited=null;}
+function openClick(i,act){
+  if(act==='Fold')state.choices=Array(i+1).fill('Fold');
+  else state.choices=Array(i).fill('Fold').concat([act]);
+  resetSel();renderAll();
+}
+function openFocus(i){state.choices=Array(i).fill('Fold');resetSel();renderAll();}
+function foldsBetween(t,fseat,s){   // focus 與 s 之間（含 focus）還需行動的活人數
+  let n=0;for(let x=fseat;x<s;x++){if(!(t.folded&&t.folded[x])&&t.inv[x]<t.highest-1e-9)n++;}return n;
+}
+function previewClick(s,act){
+  const t=tree();const fseat=t.nodes[t.focus].seat;
+  state.choices=state.choices.concat(Array(foldsBetween(t,fseat,s)).fill('Fold'),[act]);
+  resetSel();renderAll();
+}
+function focusPreview(s){
+  const t=tree();const fseat=t.nodes[t.focus].seat;
+  state.choices=state.choices.concat(Array(foldsBetween(t,fseat,s)).fill('Fold'));
+  resetSel();renderAll();
+}
+function focusNode(i){state.choices=state.choices.slice(0,i);resetSel();renderAll();}
+function chooseAction(i,act){
+  state.choices=state.choices.slice(0,i);state.choices[i]=act;
+  resetSel();renderAll();
+}
+
+/* ===========================================================================
+   渲染：頂部 freq bar
+   =========================================================================== */
+function renderFreqbar(){
+  const bar=document.getElementById('freqbar');
+  if(!nodeHasData()){
+    bar.innerHTML='<div style="color:var(--text-faint);padding-left:8px">No Data — 此節點尚未建檔(請用更高 --maxlevel 重 build)</div>';
+    document.getElementById('legend').innerHTML='';
+    document.getElementById('rangeInfo').textContent='';
+    return;
+  }
+  const pred=predicate();const pool=getPool().filter(pred);
+  const d=aggSlots(pool);
+  const parts=[];
+  [['fold','seg-fold','Fold'],['call','seg-call','Call'],['pot','seg-pot','Pot']].forEach(([k,cls,key])=>{
+    if(d[k]>0.005)parts.push(`<div class="${cls}" style="width:${(d[k]*100).toFixed(1)}%;background:${colorForKey(key)}">${Math.round(d[k]*100)}%</div>`);
+  });
+  bar.innerHTML=parts.join('')||'<div style="color:var(--text-faint);padding-left:8px">無符合 combo</div>';
+  const acts=focusActions();
+  document.getElementById('legend').innerHTML=acts.map(a=>`<span><i style="background:${colorOf(a)}"></i>${a}</span>`).join('');
+  // Range %:依實際 combo 數 × reach 加權(非單純代表手牌數)
+  const wsum=cs=>cs.reduce((s,c)=>s+(c.wt||1)*(c.reach==null?1:c.reach),0);
+  const total=wsum(getPool()),shown=wsum(pool);
+  document.getElementById('rangeInfo').textContent='Range: '+(total?(shown/total*100).toFixed(2):'0.00')+'%';
+}
+
+/* ===========================================================================
+   渲染：Matrix
+   =========================================================================== */
+function renderMatrixHeader(){
+  const wrap=document.getElementById('matrixHdr');if(!wrap)return;
+  const s=['','','',''];
+  if(state.topCell){
+    s[0]=state.topCell.hi; s[1]=state.topCell.pair?state.topCell.hi:state.topCell.lo;
+    if(state.activeSub){s[2]=state.activeSub[0];s[3]=state.activeSub[1];}
+  }
+  const tile=x=>`<span class="ctile${x?' fill':''}">${x}</span>`;
+  const hint=state.matrixLevel===0
+    ? 'Select your pair or highest two cards. Top Right: Good Suit / Bottom Left: Bad Suit'
+    : '選另外兩張牌組成 4-card；右上=good suit / 左下=bad suit（再點同格取消）';
+  wrap.innerHTML=`<span class="ctiles" id="tHi">${tile(s[0])}${tile(s[1])}</span>`
+    +`<span class="ctiles" id="tLo" style="margin-left:3px">${tile(s[2])}${tile(s[3])}</span>`
+    +`<span class="hint">${hint}</span>`;
+  const tHi=document.getElementById('tHi'),tLo=document.getElementById('tLo');
+  if(state.topCell){tHi.style.cursor='pointer';
+    tHi.onclick=()=>{state.matrixLevel=0;state.topCell=null;state.activeSub=null;state.subSuited=null;renderAll();};}
+  if(state.activeSub){tLo.style.cursor='pointer';
+    tLo.onclick=()=>{state.activeSub=null;state.subSuited=null;renderAll();};}
+}
+function renderMatrix(){
+  const area=document.getElementById('viewArea');
+  area.innerHTML=`<div class="msub" id="matrixHdr"></div>
+    <div class="matrix-main">
+      <div class="grid" id="grid"></div>
+      <div class="suit-filter">
+        <div class="ttl">Suit filter:</div>
+        ${['Single Suited','Double Suited','Trip Suited','Monotone / Rainbow'].map(s=>
+          `<button class="sf-btn${state.suitBtns.has(s)?' active':''}" data-suit="${s}">${s}</button>`).join('')}
+      </div>
+    </div>`;
+  renderMatrixHeader();
+  area.querySelectorAll('.sf-btn').forEach(b=>b.onclick=()=>{
+    const s=b.dataset.suit;state.suitBtns.has(s)?state.suitBtns.delete(s):state.suitBtns.add(s);renderAll();
+  });
+  state.matrixLevel===0?renderTopGrid():renderSubGrid();
+}
+function mkHdrCell(t){const h=document.createElement('div');h.className='gcell hdr';h.textContent=t;return h;}
+function paintCell(cell,d){
+  const segs=document.createElement('div');segs.className='segs';
+  if(d.empty){cell.classList.add('dead');}
+  else segs.innerHTML=`<div style="width:${(d.fold*100).toFixed(1)}%;background:var(--c-fold)"></div>
+    <div style="width:${(d.call*100).toFixed(1)}%;background:var(--c-call)"></div>
+    <div style="width:${(d.pot*100).toFixed(1)}%;background:${colorForKey('Pot')}"></div>`;
+  cell.appendChild(segs);
+}
+function renderTopGrid(){
+  const grid=document.getElementById('grid');grid.innerHTML='';
+  const pred=predicate();
+  grid.appendChild(mkHdrCell(''));
+  RANKS.forEach(r=>grid.appendChild(mkHdrCell(r)));
+  RANKS.forEach((rr,r)=>{
+    grid.appendChild(mkHdrCell(rr));
+    RANKS.forEach((cc,c)=>{
+      const pair=r===c;const hi=RANKS[Math.min(r,c)],lo=RANKS[Math.max(r,c)];
+      const cell=document.createElement('div');
+      cell.className='gcell '+(pair?'pair':'suited');
+      // 與子格同源:受限→只含範圍內(範圍外=空=黑);非受限→含預設 fold
+      const combos=getSubCombos(hi,lo,pair).filter(pred);
+      paintCell(cell,aggSlots(combos));
+      const lab=document.createElement('div');lab.className='lab';lab.textContent=pair?hi+hi:hi+lo;cell.appendChild(lab);
+      cell.onclick=()=>{state.topCell={hi,lo,pair};state.matrixLevel=1;state.activeSub=null;state.subSuited=null;renderAll();};
+      grid.appendChild(cell);
+    });
+  });
+}
+function renderSubGrid(){
+  const grid=document.getElementById('grid');grid.innerHTML='';
+  const{hi,lo,pair}=state.topCell;const pred=predicate();
+  const subs=getSubCombos(hi,lo,pair).filter(pred);
+  const back=document.createElement('div');back.className='gcell back';back.textContent='Back';
+  back.onclick=()=>{state.matrixLevel=0;state.topCell=null;state.activeSub=null;state.subSuited=null;renderAll();};grid.appendChild(back);
+  RANKS.forEach(r=>grid.appendChild(mkHdrCell(r)));
+  RANKS.forEach((rr,r)=>{
+    grid.appendChild(mkHdrCell(rr));
+    RANKS.forEach((cc,c)=>{
+      const a=RANKS[Math.min(r,c)],b=RANKS[Math.max(r,c)];
+      const subPair=(r===c);
+      const key=a+b;
+      const want=subPair?null:(r<c);   // true=good(右上) / false=bad(左下) / null=對子(對角)
+      const isTopMark=(rr===hi&&cc===lo);  // 當下點選的 top-two 標記格（如 75）
+      const cell=document.createElement('div');
+      const combos=subs.filter(x=>{
+        const o=[x.r3,x.r4].slice().sort((p,q)=>RANKS.indexOf(p)-RANKS.indexOf(q));
+        if(!(o[0]===a&&o[1]===b))return false;
+        if(want!==null&&refSuitedOf(x)!==want)return false;
+        return true;
+      });
+      if(combos.length===0){cell.className='gcell dead';}
+      else{cell.className='gcell '+(subPair?'pair':'suited');paintCell(cell,aggSlots(combos));
+        if(state.activeSub===key&&state.subSuited===want)cell.classList.add('active-cell');}
+      const lab=document.createElement('div');lab.className='lab';lab.textContent=subPair?a+a:a+b;cell.appendChild(lab);
+      if(isTopMark){                       // top-two 標記格：黃框 + 再點跳回頂層
+        cell.classList.add('active-cell');
+        cell.onclick=()=>{state.matrixLevel=0;state.topCell=null;state.activeSub=null;state.subSuited=null;renderAll();};
+      }else if(combos.length>0)cell.onclick=()=>{
+        if(state.activeSub===key&&state.subSuited===want){state.activeSub=null;state.subSuited=null;}
+        else{state.activeSub=key;state.subSuited=want;}
+        renderAll();
+      };
+      grid.appendChild(cell);
+    });
+  });
+}
+
+/* 左側 combo 列表 */
+function fmtEV(v){return state.tg.evpot?Math.round(v/potSize()*100)+'%':v.toFixed(2);}
+function potSize(){const n=activeNode();return n&&n.potBefore!=null?n.potBefore:1.5;}
+function renderComboRows(combos){
+  combos=dedupBySig(combos).slice().sort((a,b)=>maxEVof(b)-maxEVof(a)||CAT_RANK[a.cat]-CAT_RANK[b.cat]);  // 去重 + EV 由高到低（EV 相同時依類別 Double→Single→Trip→Mono→Rainbow）
+  const showDiff=state.tg.evdiff;
+  let html=`<div class="combo-head"><div>Hand</div><div>Frequency</div><div class="num">${state.tg.evpot?'EV%':'maxEV'}</div><div class="num">${showDiff?'EVdiff':''}</div></div><div class="combo-list">`;
+  combos.forEach(cm=>{
+    const bestFreq=Object.keys(cm.freqs).reduce((a,b)=>cm.freqs[a]>=cm.freqs[b]?a:b); // 頻率最高(顯示 % 用)
+    const bestEV=Object.keys(cm.ev).reduce((a,b)=>cm.ev[a]>=cm.ev[b]?a:b);            // EV 最高(maxEV 用)
+    const f=Math.round(cm.freqs[bestFreq]*100);
+    const cards=cm.ranks4.map((r,i)=>`<div class="card ${cm.suits4[i]}">${r}<span class="suit">${SUIT_SYM[cm.suits4[i]]}</span></div>`).join('');
+    // 頻率 bar:依此節點實際有的動作鍵(含 All-in/Check 正確顏色)
+    const bar=['Fold','Call','Pot'].filter(a=>cm.freqs[a]>0.0005).map(a=>`<div style="width:${(cm.freqs[a]*100).toFixed(1)}%;background:${colorForKey(a)}"></div>`).join('');
+    html+=`<div class="combo-row">
+      <div class="cards">${cards}</div>
+      <div class="cbar">${bar}<div class="lbl">${f}%</div></div>
+      <div class="num">${fmtEV(cm.ev[bestEV])}</div>
+      <div class="num ${cm.evdiff[bestEV]>=0?'ev-pos':'ev-neg'}">${showDiff?(cm.evdiff[bestEV]>=0?'+':'')+fmtEV(cm.evdiff[bestEV]):''}</div>
+    </div>`;
+  });
+  return html+'</div>';
+}
+function renderSubListAll(){
+  const{hi,lo,pair}=state.topCell;const pred=predicate();
+  const subs=getSubCombos(hi,lo,pair).filter(pred);
+  document.getElementById('detailTitle').textContent=(pair?hi+hi:hi+lo)+` — ${dedupBySig(subs).length} combos`;
+  document.getElementById('comboArea').innerHTML=subs.length?renderComboRows(subs):'<div class="empty-hint">無符合 combo。</div>';
+}
+function renderSubList(a,b,want){
+  const{hi,lo,pair}=state.topCell;const pred=predicate();
+  const subs=getSubCombos(hi,lo,pair).filter(x=>{const o=[x.r3,x.r4].slice().sort((p,q)=>RANKS.indexOf(p)-RANKS.indexOf(q));return o[0]===a&&o[1]===b&&(want===null||refSuitedOf(x)===want)&&pred(x);});
+  const label=(pair?hi+hi:hi+lo)+a+b+(want===true?' (good suit)':want===false?' (bad suit)':'');
+  document.getElementById('detailTitle').textContent=label+` — ${dedupBySig(subs).length} combos`;
+  document.getElementById('comboArea').innerHTML=subs.length?renderComboRows(subs):'<div class="empty-hint">無符合 combo。</div>';
+}
+
+/* ===========================================================================
+   渲染：Range view
+   =========================================================================== */
+function renderRange(){
+  const area=document.getElementById('viewArea');
+  const pred=predicate();const pool=getPool().filter(pred);
+  const acts=focusActions();
+  const totW=pool.length;
+  const rh=(label,col)=>`<div class="num rh" onclick="sortRange('${col}')">${label}${state.rsort.col===col?(state.rsort.dir<0?' ▼':' ▲'):''}</div>`;
+  let cols='';
+  acts.forEach(a=>{
+    const slot=slotOf(a);const dk=dataKey(a);          // All-in/Check → 對應資料鍵
+    const WT=c=>(c.wt||1)*(c.reach==null?1:c.reach);
+    let list=pool.filter(c=>state.tg.zero?true:c.freqs[dk]>0);
+    const sc=state.rsort.col,sd=state.rsort.dir;
+    const keyOf=c=>sc==='freq'?c.freqs[dk]:sc==='evdiff'?c.evdiff[dk]:sc==='wt'?c.wt:c.ev[dk];
+    list.sort((x,y)=>(keyOf(x)-keyOf(y))*sd);
+    const share=totW?(pool.reduce((s,c)=>s+c.freqs[dk]*WT(c),0)/pool.reduce((s,c)=>s+WT(c),0)*100):0;
+    const cnt=Math.round(share/100*270725);
+    const showDiff=state.tg.evdiff;
+    const grid=showDiff?'grid-template-columns:120px 52px 1fr 1fr 34px':'grid-template-columns:120px 60px 1fr 40px';
+    let rows='';
+    list.slice(0,200).forEach(c=>{
+      const cards=c.ranks4.map((r,i)=>`<div class="card ${c.suits4[i]}">${r}<span class="suit">${SUIT_SYM[c.suits4[i]]}</span></div>`).join('');
+      const fr=Math.round(c.freqs[dk]*100);
+      rows+=`<div class="rrow" style="${grid}">
+        <div class="cards">${cards}</div>
+        <div class="num">${fr}%</div>
+        <div class="num">${fmtEV(c.ev[dk])}</div>
+        ${showDiff?`<div class="num ${c.evdiff[dk]>=0?'ev-pos':'ev-neg'}">${(c.evdiff[dk]>=0?'+':'')+fmtEV(c.evdiff[dk])}</div>`:''}
+        <div class="num">${c.wt.toFixed(2)}</div>
+      </div>`;
+    });
+    cols+=`<div class="rcol ${slot}">
+      <div class="rcol-head"><span>⤓ ${a} ${share.toFixed(1)}%</span><span class="cnt">${(cnt/1000).toFixed(1)}k</span></div>
+      <div class="rtable-head" style="${grid}"><div>Hand</div>${rh('Freq%','freq')}${rh(state.tg.evpot?'EV%':'EV','ev')}${showDiff?rh('EV Diff','evdiff'):''}${rh('WT','wt')}</div>
+      <div class="rlist">${rows||'<div class="empty-hint">無 combo</div>'}</div>
+    </div>`;
+  });
+  area.innerHTML=`<div class="range-cols">${cols}</div>`;
+}
+
+/* ===========================================================================
+   filter 語法面板
+   =========================================================================== */
+function renderFilterRef(){
+  const rows=[
+    ['A','Any rank','任一張該 rank'],
+    ['Axx','Suited card','該 rank 與他牌同花'],
+    ['$B','Broadway (K-T)',''],['$M','Middle (9-6)',''],['$L','Low (5-2)',''],
+    ['RR','Any pocket pair','至少一對'],['RROO','Double pocket pair','兩對'],['$np','No pairs',''],
+    ['$ss','Single Suited',''],['$ds','Double Suited',''],['$ts','Trip Suited',''],
+    ['$rb','Rainbow',''],['$ms','Monotone',''],
+    ['!','NOT','!RR 排除對子'],[',','OR','A,K = A 或 K'],[':','AND','RR:$ds'],['( )','Group','A:(K,Q)'],
+  ];
+  document.getElementById('filterRef').innerHTML=
+    `<div class="fsec">${rows.map(([t,n,d])=>`<div class="frow"><div class="ftok">${t}</div><div class="fdesc"><b>${n}</b> ${d?'<small>— '+d+'</small>':''}</div></div>`).join('')}</div>
+     <div class="hint">在搜尋框輸入上述語法即可即時篩選。</div>`;
+}
+
+/* ===========================================================================
+   事件 + 初始化
+   =========================================================================== */
+function applyViewChrome(){
+  const isRange=state.view==='Range';
+  document.getElementById('subviewWrap').style.display=isRange?'flex':'none';
+  document.getElementById('rangeToggles').style.display=isRange?'flex':'none';
+  document.getElementById('searchbar').style.display=isRange?'flex':'none';
+}
+document.querySelectorAll('.view-toggle button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.view-toggle button').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');state.view=b.dataset.view;
+  renderAll();
+});
+document.querySelectorAll('.tg').forEach(t=>t.onclick=()=>{
+  const k=t.dataset.tg;state.tg[k]=!state.tg[k];t.classList.toggle('on',state.tg[k]);renderAll();
+});
+document.getElementById('search').oninput=e=>{state.search=e.target.value;renderAll();};
+document.getElementById('filterBtn').onclick=()=>{renderFilterRef();document.getElementById('modalBg').classList.add('show');};
+document.getElementById('modalX').onclick=()=>document.getElementById('modalBg').classList.remove('show');
+document.getElementById('modalBg').onclick=e=>{if(e.target.id==='modalBg')e.target.classList.remove('show');};
+
+function renderLoaded(){
+  if(phase().t==='terminal'||tree().closed){
+    document.getElementById('freqbar').innerHTML='<div style="color:var(--text-faint);padding-left:8px">此行動線已結束 — 無決策</div>';
+    document.getElementById('legend').innerHTML='';
+    document.getElementById('viewArea').innerHTML='<div class="empty-hint">此行動線已結束。點上方行動線其他選項繼續。</div>';
+    document.getElementById('detailTitle').textContent='';
+    document.getElementById('comboArea').innerHTML='';
+    return;
+  }
+  renderFreqbar();
+  if(state.view==='Matrix'){renderMatrix();
+    if(state.matrixLevel===1){
+      if(state.activeSub)renderSubList(state.activeSub[0],state.activeSub[1],state.subSuited);
+      else renderSubListAll();
+    }
+  }
+  else renderRange();
+}
+
+const lazyCache=new Map(), lazyPending=new Map(), lazyErrors=new Map();
+const CACHE_LIMIT=20;
+window.PLOC_DATA=Object.create(null);
+let lazyReady=null, lazyIndexError=null, lazyRenderedKey=null, preloadTicket=0;
+function localScript(src){return new Promise((resolve,reject)=>{
+  const s=document.createElement('script');s.src=src;s.async=true;
+  s.onload=()=>{s.remove();resolve();};s.onerror=()=>{s.remove();reject(new Error('無法讀取 '+src));};document.head.appendChild(s);
+});}
+window.PLOC_REGISTER=function(generation,key,payload){
+  if(!window.PLOC_INDEX||generation!==window.PLOC_INDEX.generation)return;
+  lazyCache.set(key,{payload});
+};
+function trimLazyCache(){
+  const current=lineKey();
+  for(const key of lazyCache.keys()){
+    if(lazyCache.size<=CACHE_LIMIT)break;
+    if(key===current||lazyPending.has(key))continue;
+    lazyCache.delete(key);delete window.PLOC_DATA[key];
+  }
+}
+function ensureLazyReady(){
+  if(!lazyReady)lazyReady=(async()=>{
+    if(!window.PLOC_INDEX)await localScript('PLOC_index.js');
+    if(!window.PLOC_INDEX?.spots)throw new Error('索引格式不正確，請重新 build');
+    await localScript(window.PLOC_INDEX.combos);
+    if(typeof window.PLOC_DECODE!=='function')throw new Error('Combo decoder 未載入');
+  })();
+  return lazyReady;
+}
+function touchLazy(key){const entry=lazyCache.get(key);if(!entry)return null;lazyCache.delete(key);lazyCache.set(key,entry);return entry;}
+function loadLazy(key){
+  if(lazyCache.has(key))return Promise.resolve(touchLazy(key));
+  if(lazyPending.has(key))return lazyPending.get(key);
+  if(lazyErrors.has(key))return Promise.reject(lazyErrors.get(key));
+  const src=window.PLOC_INDEX?.spots[key];if(!src)return Promise.resolve(null);
+  const promise=localScript(src).then(()=>{
+    const e=touchLazy(key);if(!e)throw new Error('Spot 檔案內容不符');return e;
+  }).catch(e=>{lazyErrors.set(key,e);throw e;}).finally(()=>{lazyPending.delete(key);trimLazyCache();});
+  lazyPending.set(key,promise);return promise;
+}
+function showLazyMessage(message,retry){
+  document.getElementById('freqbar').textContent=message;
+  document.getElementById('legend').textContent='';
+  document.getElementById('rangeInfo').textContent='';
+  document.getElementById('detailTitle').textContent='';
+  document.getElementById('comboArea').textContent='';
+  const area=document.getElementById('viewArea');area.replaceChildren();
+  const div=document.createElement('div');div.className='empty-hint';div.textContent=message;area.append(div);
+  if(retry){const btn=document.createElement('button');btn.className='filter-btn';btn.textContent='重新讀取';btn.onclick=retry;area.append(btn);}
+}
+function preloadNext(){
+  const ticket=++preloadTicket,key=lineKey(), choices=state.choices.slice();
+  const idle=window.requestIdleCallback||((cb)=>setTimeout(cb,100));
+  idle(async()=>{
+    if(ticket!==preloadTicket||key!==lineKey())return;
+    const t=computeNodes(choices);if(t.closed)return;
+    const candidates=t.nodes[t.focus].actions.map(a=>{
+      const seq=choices.concat(a),next=computeNodes(seq);if(next.closed)return null;
+      const n=next.nodes[next.focus];return seq.map((act,i)=>POS[next.nodes[i].seat]+':'+act).join('|')+'>FOCUS:'+POS[n.seat]+'@L'+n.level;
+    }).filter(k=>k&&window.PLOC_INDEX.spots[k]);
+    for(const k of candidates){if(ticket!==preloadTicket||key!==lineKey())return;try{await loadLazy(k);}catch(e){/* error shown if selected */}}
+  });
+}
+let lazyInitialized=false, preloadedKey=null;
+function renderAll(){
+  applyViewChrome();renderTree();
+  const key=lineKey();
+  if(key!==lazyRenderedKey){poolCache.clear();poolIdxCache.clear();cellCache.clear();lazyRenderedKey=key;preloadTicket++;preloadedKey=null;}
+  if(phase().t==='terminal'||tree().closed){renderLoaded();return;}
+  if(lazyIndexError){showLazyMessage('資料索引讀取失敗：'+lazyIndexError.message,()=>{lazyReady=null;lazyIndexError=null;renderAll();});return;}
+  if(!lazyInitialized){
+    showLazyMessage('Loading… 正在載入資料索引');
+    ensureLazyReady().then(()=>{if(!lazyInitialized){lazyInitialized=true;renderAll();}}).catch(e=>{lazyIndexError=e;renderAll();});return;
+  }
+  if(!window.PLOC_INDEX.spots[key]){showLazyMessage('No Data — 此節點尚未建檔或缺少 raw 資料');return;}
+  const entry=touchLazy(key);
+  if(entry){
+    if(!entry.decoded){entry.decoded={combos:window.PLOC_DECODE(entry.payload)};delete entry.payload;}
+    window.PLOC_DATA[key]=entry.decoded;trimLazyCache();renderLoaded();if(preloadedKey!==key){preloadedKey=key;preloadNext();}return;
+  }
+  if(lazyErrors.has(key)){showLazyMessage('Spot 讀取失敗：'+lazyErrors.get(key).message,()=>{lazyErrors.delete(key);renderAll();});return;}
+  showLazyMessage('Loading… 正在載入目前 Spot');
+  loadLazy(key).then(()=>{if(lineKey()===key)renderAll();}).catch(()=>{if(lineKey()===key)renderAll();});
+}
+
+renderAll();
+</script>
+</body>
+</html>
