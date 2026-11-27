@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PLOC Preflop Matrix V2 — Lazy Loading</title>
+<title>PLO Preflop Viewer</title>
 <style>
 :root{
   --bg:#0c0c0e; --panel:#161619; --panel-2:#1c1c20; --border:#2a2a30; --border-light:#3a3a42;
@@ -143,6 +143,225 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 .ftok{background:#111;border:1px solid var(--border);border-radius:5px;padding:3px 6px;text-align:center;font-family:monospace;color:#cfd3dc;height:fit-content}
 .fdesc b{color:#fff}
 .fdesc small{color:var(--text-dim)}
+
+.scenario-edit{background:var(--panel-2);border:1px solid var(--border-light);border-radius:4px;padding:3px 7px;font-size:15px;color:var(--text)}
+#scenarioModal .modal{width:min(1050px,95vw)}
+.scenario-table{width:100%;border-collapse:collapse;text-align:left;font-size:13px}.scenario-table th,.scenario-table td{padding:12px 10px;border-bottom:1px solid var(--border)}.scenario-table th{color:var(--text-dim);font-weight:500}.scenario-table tbody tr{cursor:pointer}.scenario-table tbody tr:hover,.scenario-table tr.current{background:var(--border-light)}
+.p5-cell{background:#29292f;border:1px solid #414149}.p5-cell .lab{color:#d0d0d6!important}.p5-cell:hover{background:#414149}.p5-cell.dead{background:#141417}.p5-cell.dead .lab{color:#57575f!important}.p5-cell.pair{border-color:#777}.p5-note{color:var(--text-dim);font-size:12px;padding:6px 0}.p5-tiles .ctile{background:#57575c;color:#ddd;box-shadow:none}.p5-tiles .ctile.fill{background:#ededf0;color:#111}.p5-tiles .ctile.free{background:#57575c;color:#fff}.p5-filter .sf-btn{text-align:left}.p5-filter .sf-btn.active{background:#3d3d43;border-color:#707078}.p5-combo .combo-row,.p5-combo .combo-head{grid-template-columns:126px 1fr 46px 50px}.p5-combo .cbar{background:#29292f;color:#888;text-align:center;font-size:11px}.p5-combo .combo-row .num{color:var(--text)}.p5-combo .combo-row .ev-pos{color:var(--c-call)}.p5-combo .combo-row .ev-neg{color:var(--c-pot)}
+
+/* V3.8 — low-glare theme, shared by PLO4/PLO5; presentation only */
+:root{
+  color-scheme:dark;
+  --bg:#191a1c;--panel:#222326;--panel-2:#292a2e;
+  --border:#34363a;--border-light:#484a50;
+  --text:#e0e2e5;--text-dim:#b6bac1;--text-faint:#898e97;
+  --c-fold:#72a8d6;--c-call:#65ba98;--c-pot:#e79391;--c-allin:#df777d;
+  --radius:5px;
+}
+body{font-family:Arial,"Segoe UI","Noto Sans TC",sans-serif;font-size:13px;line-height:1.4;-webkit-font-smoothing:antialiased}
+button,input{font-family:inherit}
+.scenario,.pos-col,.detail,.center{box-shadow:none}
+.pos-col.focus{border-color:#73bd9d;box-shadow:inset 0 0 0 1px #73bd9d}
+.pos-col.preview{opacity:.8}
+.pos-head{font-size:14px;font-weight:600}
+.act-btn{font-size:13px;font-weight:400;border-radius:3px}
+.act-btn.sel-fold,.act-btn.sel-call,.act-btn.sel-pot{color:#172126}
+.tag{font-size:11.5px;background:#2c2d31;color:var(--text-dim)}
+.view-toggle button,.subview button,.sf-btn,.train-btn{font-size:13px}
+.grid{gap:2px;grid-template-rows:24px repeat(13,minmax(0,1fr))}
+.gcell{border-radius:2px;border:0;font-weight:500;font-size:14px}
+.gcell.hdr{background:#292a2e;color:#c3c7ce;font-weight:500}
+.gcell.back{background:#33353a;color:var(--text);font-weight:500}
+.gcell.dead{background:#252629;color:#747982}
+.gcell.pair{box-shadow:inset 0 0 0 1px rgba(245,245,245,.48)}
+.gcell.suited{box-shadow:none}
+.gcell .lab,.gcell.pair .lab,.gcell.suited .lab{font-size:15px;font-weight:500;letter-spacing:0;text-shadow:none}
+.gcell.pair:not(.dead) .lab,.gcell.suited:not(.dead) .lab{color:#15201f}
+.gcell.dead .lab{color:#747982}
+.gcell.active-cell{outline:2px solid #dfc778;outline-offset:-2px}
+.gcell:not(.dead):not(.hdr):hover{filter:brightness(1.07)}
+.ctile{background:#484a50;border-radius:3px}
+.ctile.fill{background:#e0e2e5;color:#202226;box-shadow:0 0 0 1px #c8cbd0}
+.freqbar{height:20px;border-radius:3px;background:#303237;flex-shrink:0}
+.freqbar>div{font-size:12px;font-weight:500;color:#142025}
+.legend{font-size:12px;color:var(--text-dim)}
+.combo-head,.rtable-head{font-size:12px;color:var(--text-dim)}
+.combo-row,.rrow{font-size:13px;line-height:1.35}
+.combo-row{padding-top:4px;padding-bottom:4px}
+.combo-row:nth-child(even),.rrow:nth-child(odd){background:#26272a}
+.cbar,.p5-combo .cbar{background:#34363b;border-radius:2px;height:15px}
+.cbar .lbl{font-size:11px;font-weight:500;color:#172025}
+.card{font-size:12px;font-weight:600;border-color:#565961;border-radius:3px}
+.card.s{background:#494d55}.card.h{background:#b94e60}.card.d{background:#416fa4}.card.c{background:#438661}
+.ev-pos,.p5-combo .combo-row .ev-pos{color:#79c8a5}
+.ev-neg,.p5-combo .combo-row .ev-neg{color:#eca3a0}
+.rcol.fold .rcol-head,.rcol.call .rcol-head,.rcol.pot .rcol-head{color:#172025}
+.sf-btn{background:#292a2e;color:#c1c5cc;border-radius:3px}
+.sf-btn.active,.p5-filter .sf-btn.active{background:#3c434a;border-color:#82929e;color:#f0f1f2}
+.hint{color:var(--text-faint)}
+.combo-list,.rlist,.tree,.modal{scrollbar-width:thin;scrollbar-color:#595d65 #292a2e}
+::-webkit-scrollbar{width:9px;height:9px}::-webkit-scrollbar-track{background:#292a2e}::-webkit-scrollbar-thumb{background:#595d65;border:2px solid #292a2e;border-radius:6px}
+button:focus-visible,.gcell:focus-visible{outline:2px solid #dfc778;outline-offset:1px}
+
+
+/* V3.9 — brighter neutral dark theme and rank-only four-color cards */
+:root{
+  --bg:#202020;--panel:#282828;--panel-2:#303030;
+  --border:#393939;--border-light:#505050;
+  --text:#f0f0f0;--text-dim:#c7c7c7;--text-faint:#a0a0a0;
+  --c-fold:#56a5e8;--c-call:#12cb92;--c-pot:#ff8588;--c-allin:#eb686e;
+}
+.tag,.gcell.hdr,.sf-btn{background:#303030;color:#d3d3d3}
+.gcell.dead{background:#292929;color:#929292}
+.gcell.dead .lab{color:#929292}
+.gcell.back{background:#3b3b3b}
+.combo-row:nth-child(even),.rrow:nth-child(odd){background:#2b2b2b}
+.card{font-size:14px;font-weight:600;line-height:1;border-color:#626262}
+.card .suit{display:none}
+.card.s{background:#505050}.card.h{background:#d84249}.card.d{background:#327bc6}.card.c{background:#27894e}
+.ev-pos,.p5-combo .combo-row .ev-pos{color:#40d88a}
+.ev-neg,.p5-combo .combo-row .ev-neg{color:#ff9696}
+.freqbar,.cbar,.p5-combo .cbar{background:#383838}
+
+
+/* V3.10 — reference-matched matrix, CSS only */
+:root{
+  --bg:#1d1d1d;--panel:#222222;--panel-2:#272727;
+  --border:#303030;--border-light:#454545;
+  --text:#ededed;--text-dim:#bcbcbc;--text-faint:#999999;
+  --c-fold:#4894da;--c-call:#00d58e;--c-pot:#ff8384;--c-allin:#eb686e;
+}
+body{font-family:Arial,"Segoe UI","Noto Sans TC",sans-serif;line-height:1.35}
+.grid{gap:1px;grid-template-rows:minmax(28px,1fr) repeat(13,minmax(0,1fr))}
+.gcell{border-radius:2px;border:0;font-size:16px;font-weight:400}
+.gcell.hdr{background:#272727;color:#e4e4e4;font-size:17px;font-weight:500}
+.gcell.back{background:#494949;color:#fff;font-size:16px}
+.gcell.dead{background:#242424;color:#666;cursor:default}
+.gcell.dead .lab{color:#666}
+.gcell .lab,.gcell.pair .lab,.gcell.suited .lab{font-size:16px;font-weight:500;letter-spacing:0}
+.gcell.pair:not(.dead) .lab,.gcell.suited:not(.dead) .lab{color:#111}
+.gcell.pair{box-shadow:none}
+.gcell.pair:not(.dead)::after{content:"";position:absolute;inset:0;border:1px solid #e8e8e8;border-radius:2px;pointer-events:none;z-index:2}
+.gcell.active-cell{outline:2px solid #f4d773;outline-offset:-2px;z-index:3}
+.gcell.active-cell::after{content:none}
+.gcell:not(.dead):not(.hdr):hover{filter:brightness(1.05)}
+.ctile{width:24px;height:27px;background:#555;border:1px solid #777;border-radius:2px}
+.ctile.fill{background:#f7f7f7;color:#111;border-color:#fff;box-shadow:none}
+.tag{background:#303030;color:#ddd;font-size:11.5px;padding:2px 5px}
+.act-btn{background:#272727;border-color:#333;color:#d5d5d5;font-size:13px}
+.sf-btn{background:#272727;border-color:#363636;color:#d6d6d6}
+.combo-row:nth-child(even),.rrow:nth-child(odd){background:rgba(255,255,255,.012)}
+.card{font-size:14px;font-weight:600;border-radius:2px;box-shadow:none}
+.card .suit{display:none}
+.card.s{background:#505050}.card.h{background:#d84249}.card.d{background:#327bc6}.card.c{background:#27894e}
+.freqbar,.cbar,.p5-combo .cbar{background:#303030}
+.combo-list,.rlist,.tree,.modal{scrollbar-color:#555 #272727}
+::-webkit-scrollbar-track{background:#272727}::-webkit-scrollbar-thumb{background:#555;border-color:#272727}
+/* Lower triangle: visual distinction only; action frequencies remain unchanged. */
+.grid:has(> .back) > .gcell:nth-child(30):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(44):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(45):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(58):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(59):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(60):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(72):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(73):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(74):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(75):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(86):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(87):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(88):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(89):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(90):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(100):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(101):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(102):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(103):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(104):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(105):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(114):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(115):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(116):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(117):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(118):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(119):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(120):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(128):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(129):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(130):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(131):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(132):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(133):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(134):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(135):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(142):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(143):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(144):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(145):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(146):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(147):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(148):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(149):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(150):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(156):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(157):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(158):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(159):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(160):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(161):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(162):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(163):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(164):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(165):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(170):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(171):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(172):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(173):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(174):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(175):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(176):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(177):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(178):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(179):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(180):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(184):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(185):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(186):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(187):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(188):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(189):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(190):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(191):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(192):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(193):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(194):not(.dead) > .segs,
+.grid:has(> .back) > .gcell:nth-child(195):not(.dead) > .segs{filter:brightness(.86)}
+
+
+/* V3.13 — reference proportions and intermediate matrix typography */
+:root{--bg:#191919;--panel:#1d1d1d;--panel-2:#272727;--border:#292929;--c-fold:#51acff;--c-call:#00d58e;--c-pot:#ff8384}
+body{font-family:"Segoe UI",Arial,"Noto Sans TC",sans-serif;line-height:1.3}
+.grid{gap:1px}
+.gcell .lab,.gcell.pair .lab,.gcell.suited .lab{font-family:"Segoe UI",Arial,sans-serif;font-size:15.5px;font-weight:600;letter-spacing:0;text-shadow:none;-webkit-text-stroke:0}
+.gcell.hdr{font-family:"Segoe UI",Arial,sans-serif;font-size:16px;font-weight:500}
+.gcell.dead .lab{font-weight:500;color:#747474}
+.gcell.pair:not(.dead)::after{border:1px solid #f4f4f4}
+.combo-head,.combo-row{grid-template-columns:88px minmax(65px,1fr) 46px 50px;gap:7px}
+.p5-combo .combo-head,.p5-combo .combo-row{grid-template-columns:110px minmax(65px,1fr) 46px 50px;gap:7px}
+.combo-row{padding-top:3px;padding-bottom:3px;font-size:12px;line-height:1.25}
+.card{width:18px;height:21px;font-size:12px;font-weight:600;flex-shrink:0}
+.cards{gap:2px}
+.card.s{background:#494949}.card.h{background:#e83030}
+.cbar,.p5-combo .cbar{height:15px}
+.freqbar{height:18px}
+.sf-btn{font-size:13px;padding:8px 10px}
+.pos-col.focus{border-color:var(--c-call);box-shadow:inset 0 0 0 1px var(--c-call)}
+@media(max-width:1100px){.combo-head,.combo-row{grid-template-columns:76px minmax(35px,1fr) 40px 44px;gap:4px}.p5-combo .combo-head,.p5-combo .combo-row{grid-template-columns:94px minmax(35px,1fr) 40px 44px;gap:4px}}
+
+
+/* V3.14 — restore V3.11 layout proportions; keep V3.13 colors and matrix typography */
+.topbar{font-family:Arial,"Segoe UI","Noto Sans TC",sans-serif;line-height:1.35}
+.center{line-height:1.35}
 </style>
 </head>
 <body>
@@ -151,8 +370,8 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
   <!-- 頂部 -->
   <div class="topbar">
     <div class="scenario">
-      <div class="scenario-head"><h2>Select scenario</h2><span class="edit-icon">✎</span></div>
-      <div class="tags">
+      <div class="scenario-head"><h2>Select scenario</h2><button class="edit-icon scenario-edit" id="scenarioEdit" aria-label="Select scenario">✎</button></div>
+      <div class="tags" id="scenarioTags">
         <span class="tag">Cash</span><span class="tag">Preflop</span><span class="tag">6-Max</span>
         <span class="tag">GGPoker</span><span class="tag">100bb</span><span class="tag">Low Stakes</span>
         <span class="tag">Classic</span><span class="tag">3.5x</span><span class="tag">5%, 2bb cap</span>
@@ -205,6 +424,7 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
   </div>
 </div>
 
+<div class="modal-bg" id="scenarioModal"><div class="modal"><h3>Select scenario <span class="x" id="scenarioClose">✕</span></h3><div class="searchbox" style="margin-bottom:12px">🔍 <input id="scenarioSearch" placeholder="Search scenario"></div><table class="scenario-table"><thead><tr><th>Game</th><th>Poker Room</th><th>Players</th><th>Stack</th><th>Stake</th><th>Format</th><th>Raise Size</th><th>Rake</th></tr></thead><tbody id="scenarioRows"></tbody></table></div></div>
 <!-- filter 語法面板 -->
 <div class="modal-bg" id="modalBg">
   <div class="modal">
@@ -685,7 +905,7 @@ function appendCol(el,seat,stackBB,actions,onClick,focus,chosen,onHead){
   });
   col.appendChild(btns);el.appendChild(col);
 }
-function resetSel(){state.matrixLevel=0;state.topCell=null;state.activeSub=null;state.subSuited=null;}
+function resetSel(){state.p5Fifth=null;state.matrixLevel=0;state.topCell=null;state.activeSub=null;state.subSuited=null;}
 function openClick(i,act){
   if(act==='Fold')state.choices=Array(i+1).fill('Fold');
   else state.choices=Array(i).fill('Fold').concat([act]);
@@ -1005,9 +1225,9 @@ function trimLazyCache(){
 }
 function ensureLazyReady(){
   if(!lazyReady)lazyReady=(async()=>{
-    if(!window.PLOC_INDEX)await localScript('PLOC_index.js');
+    if(!window.PLOC_INDEX)await localScript('PLO4/PLOC_index.js');
     if(!window.PLOC_INDEX?.spots)throw new Error('索引格式不正確，請重新 build');
-    await localScript(window.PLOC_INDEX.combos);
+    await localScript('PLO4/'+window.PLOC_INDEX.combos);
     if(typeof window.PLOC_DECODE!=='function')throw new Error('Combo decoder 未載入');
   })();
   return lazyReady;
@@ -1018,7 +1238,7 @@ function loadLazy(key){
   if(lazyPending.has(key))return lazyPending.get(key);
   if(lazyErrors.has(key))return Promise.reject(lazyErrors.get(key));
   const src=window.PLOC_INDEX?.spots[key];if(!src)return Promise.resolve(null);
-  const promise=localScript(src).then(()=>{
+  const promise=localScript('PLO4/'+src).then(()=>{
     const e=touchLazy(key);if(!e)throw new Error('Spot 檔案內容不符');return e;
   }).catch(e=>{lazyErrors.set(key,e);throw e;}).finally(()=>{lazyPending.delete(key);trimLazyCache();});
   lazyPending.set(key,promise);return promise;
@@ -1048,7 +1268,9 @@ function preloadNext(){
 }
 let lazyInitialized=false, preloadedKey=null;
 function renderAll(){
-  applyViewChrome();renderTree();
+  applyViewChrome();
+  if(gameMode===5){renderP5();return;}
+  renderTree();
   const key=lineKey();
   if(key!==lazyRenderedKey){poolCache.clear();poolIdxCache.clear();cellCache.clear();lazyRenderedKey=key;preloadTicket++;preloadedKey=null;}
   if(phase().t==='terminal'||tree().closed){renderLoaded();return;}
@@ -1067,6 +1289,79 @@ function renderAll(){
   showLazyMessage('Loading… 正在載入目前 Spot');
   loadLazy(key).then(()=>{if(lineKey()===key)renderAll();}).catch(()=>{if(lineKey()===key)renderAll();});
 }
+
+
+// Independent PLO5 UI: no PLO4 data is used here.
+let gameMode=4;
+const P5_CATS=['Single Suited','Double Suited Pure','Double Trip Suited','Trip Suited','Quad Suited','Monotone Suited'];
+const modeStates={};
+function snapshotMode(){return {choices:state.choices.slice(),view:state.view,matrixLevel:state.matrixLevel,topCell:state.topCell,activeSub:state.activeSub,subSuited:state.subSuited,suitBtns:new Set(state.suitBtns),search:state.search};}
+function switchGame(n){
+  if(gameMode!==n){modeStates[gameMode]=snapshotMode();gameMode=n;preloadTicket++;Object.assign(state,modeStates[n]||{choices:[],view:'Matrix',matrixLevel:0,topCell:null,activeSub:null,subSuited:null,suitBtns:new Set(),search:''});
+    document.getElementById('search').value=state.search;document.querySelectorAll('.view-toggle button').forEach(b=>b.classList.toggle('active',b.dataset.view===state.view));
+    document.getElementById('scenarioTags').innerHTML=[`PLO${n}`,'Cash','Preflop','6-Max','GGPoker','100bb','Low Stakes','Classic','3.5x',`5%, ${n===4?2:3}bb cap`].map(x=>`<span class="tag">${x}</span>`).join('');
+    document.getElementById('comboArea').classList.toggle('p5-combo',n===5);document.getElementById('comboArea').innerHTML='';document.getElementById('detailTitle').textContent='';renderAll();}
+  document.getElementById('scenarioModal').classList.remove('show');
+}
+function scenarioRows(){const q=document.getElementById('scenarioSearch').value.toLowerCase();const body=document.getElementById('scenarioRows');body.replaceChildren();for(const n of [4,5]){const cells=[`PLO${n}`,'GGPoker','6-Max','100bb','Low Stakes','Classic','3.5x',`5%, ${n===4?2:3}bb cap`];if(!cells.join(' ').toLowerCase().includes(q))continue;const tr=document.createElement('tr');tr.className=n===gameMode?'current':'';tr.innerHTML=cells.map(x=>`<td>${x}</td>`).join('');tr.onclick=()=>switchGame(n);body.append(tr);}}
+document.getElementById('scenarioEdit').onclick=()=>{document.getElementById('scenarioSearch').value='';scenarioRows();document.getElementById('scenarioModal').classList.add('show');};
+document.getElementById('scenarioSearch').oninput=scenarioRows;
+document.getElementById('scenarioClose').onclick=()=>document.getElementById('scenarioModal').classList.remove('show');
+document.getElementById('scenarioModal').onclick=e=>{if(e.target.id==='scenarioModal')e.target.classList.remove('show');};
+function p5Category(s){const counts={};for(const x of s)counts[x]=(counts[x]||0)+1;return {'2111':P5_CATS[0],'221':P5_CATS[1],'32':P5_CATS[2],'311':P5_CATS[3],'41':P5_CATS[4],'5':P5_CATS[5]}[Object.values(counts).sort((a,b)=>b-a).join('')];}
+function p5Good(r,s){const ord=r.map((_,i)=>i).sort((a,b)=>RANKS.indexOf(r[a])-RANKS.indexOf(r[b]));const cat=p5Category(s);const suited=i=>s.some((x,j)=>j!==i&&x===s[i]);const hi=r[ord[0]],second=r[ord[1]];const a=ord.filter(i=>r[i]===hi);if(cat===P5_CATS[1]||cat===P5_CATS[2])return a.some(i=>suited(i)&&ord.some(j=>j!==i&&r[j]===second&&suited(j)&&s[i]!==s[j]));return a.some(suited);}
+function p5Prefix(){return state.topCell?[state.topCell.hi,state.topCell.lo,...(state.activeSub||'').split(''),...(state.activeSub&&state.p5Fifth?[state.p5Fifth]:[])]:[];}
+// PLO5 data is independent of the PLO4 solver engine.
+let p5Init=null,p5Spot=null,p5Key=null,p5Pending=null,p5Error=null,p5Page=0,p5PageSig='';
+const p5Label={FOLD:'Fold',CALL:'Call',CHECK:'Check',RAISE:'Pot',ALLIN:'All-in'};
+const p5Color=t=>colorOf(p5Label[t]);
+const p5Order=['Fold','Call','Check','Pot','All-in'];
+const p5SortActions=actions=>actions.slice().sort((a,b)=>p5Order.indexOf(a)-p5Order.indexOf(b));
+const p5DisplayActions=s=>s.actions.map((a,j)=>({a,j})).sort((x,y)=>p5Order.indexOf(p5Label[x.a])-p5Order.indexOf(p5Label[y.a]));
+async function p5Ready(){if(!p5Init)p5Init=(async()=>{await localScript('PLO5/PLO5_decode.js');await localScript('PLO5/PLO5_index.js');const ix=window.PLO5_INDEX;if(!ix?.tree||!ix.spots)throw Error('Invalid PLO5 index');ix.combos='PLO5/'+ix.combos;for(const k in ix.spots)ix.spots[k]='PLO5/'+ix.spots[k];return ix;})();return p5Init;}
+function p5Trace(choices=state.choices){const ix=window.PLO5_INDEX;let key='ROOT',seat=0,inv=INV0.slice(),highest=1,raises=0;const folded=Array(6).fill(false),acted=Array(6).fill(false),nodes=[];if(!ix)return {nodes,key:null,closed:true};for(let i=0;i<=choices.length;i++){
+ const d=ix.tree[key];if(!d)return {nodes,key:null,closed:true};const actions=p5SortActions(d.actions.map(a=>p5Label[a.type]));const chosen=choices[i];const node={seat,actions,chosen,invBefore:inv[seat],invAfter:inv[seat],potBefore:inv.reduce((a,b)=>a+b,0),key};nodes.push(node);if(chosen===undefined)return {nodes,key,closed:false,node};const act=d.actions.find(a=>p5Label[a.type]===chosen);if(!act)return {nodes,key:null,closed:true};acted[seat]=true;if(act.type==='FOLD')folded[seat]=true;else if(act.type==='CALL'||act.type==='CHECK')inv[seat]=highest;else{inv[seat]=act.type==='ALLIN'?100:Math.min(100,highest+node.potBefore+highest-inv[seat]);highest=inv[seat];raises++;}node.invAfter=inv[seat];key=act.next;if(!key)return {nodes,key:null,closed:true};let found=-1;for(let j=1;j<=6;j++){const s=(seat+j)%6;if(!folded[s]&&(inv[s]<highest-1e-9||(!raises&&!acted[s]))){found=s;break;}}if(found===-1)return {nodes,key:null,closed:true};seat=found;
+ }return {nodes,key:null,closed:true};}
+function p5Choose(seq,act){state.choices=act===undefined?seq.slice():seq.concat(act);resetSel();p5Page=0;renderAll();}
+function p5Tree(){const el=document.getElementById('tree');el.replaceChildren();const t=p5Trace();t.nodes.forEach((n,i)=>appendCol(el,n.seat,100-n.invAfter,n.actions,a=>p5Choose(state.choices.slice(0,i),a),!t.closed&&i===t.nodes.length-1,n.chosen,()=>p5Choose(state.choices.slice(0,i))));if(!t.closed){let seq=state.choices.slice(),next=t;for(let i=0;i<6&&next.node?.actions.includes('Fold');i++){seq=seq.concat('Fold');next=p5Trace(seq);if(next.closed)break;const n=next.node,copy=seq.slice();appendCol(el,n.seat,100-n.invBefore,n.actions,a=>p5Choose(copy,a),false,undefined,()=>p5Choose(copy));el.lastChild.classList.add('preview');}}return t;}
+function p5Weight(s,i){return s.dict[i][3]*s.reach(0,i);}
+function p5Agg(s){return {w:0,v:new Float64Array(s.actions.length),n:0};}
+function p5Add(a,s,i,w){a.n++;a.w+=w;for(let j=0;j<s.actions.length;j++)a.v[j]+=w*s.frequency(j,i);}
+function p5Segments(s,a,labels=false){return s.actions.map((t,j)=>({t,j})).sort((x,y)=>['FOLD','CALL','CHECK','RAISE','ALLIN'].indexOf(x.t)-['FOLD','CALL','CHECK','RAISE','ALLIN'].indexOf(y.t)).map(({t,j})=>{const f=a.w?a.v[j]/a.w:0;return f>0?`<div style="width:${f*100}%;background:${p5Color(t)}" title="${p5Label[t]} ${(f*100).toFixed(2)}%">${labels&&f>0.005?Math.round(f*100)+'%':''}</div>`:'';}).join('');}
+function p5Cards(d){return [...d[1]].map((r,i)=>`<div class="card ${d[2][i]}">${r}<span class="suit">${SUIT_SYM[d[2][i]]}</span></div>`).join('');}
+function p5FmtEV(ev,t){return state.tg.evpot?Math.round(100*ev/t.node.potBefore)+'%':ev.toFixed(2);}
+function p5EV(s,j,i,t){return p5FmtEV(s.ev(j,i),t);}
+function p5DiffText(v,t){return (v>=0?'+':'')+p5FmtEV(v,t);}
+function p5Diff(s,j,i){let other=-Infinity;for(let k=0;k<s.actions.length;k++)if(k!==j)other=Math.max(other,s.ev(k,i));return Number.isFinite(other)?s.ev(j,i)-other:0;}
+function p5Filter(s,i,pred){const d=s.dict[i],cat=P5_CATS[d[4]];if(state.suitBtns.size&&!state.suitBtns.has(cat))return false;if(!pred)return true;return pred({ranks4:[...d[1]],suits4:[...d[2]],cat:['Single','Double','Double','Trip','Quad','Monotone'][d[4]]});}
+function p5List(s,ids,t){const combo=document.getElementById('comboArea');let sig=t.key+'|'+(state.view==='Range'?state.search:'')+'|'+p5Prefix().join('')+'|'+state.subSuited+'|'+[...state.suitBtns];if(sig!==p5PageSig){p5PageSig=sig;p5Page=0;}const max=i=>Math.max(...s.actions.map((_,j)=>s.ev(j,i)));ids.sort((a,b)=>max(b)-max(a));const size=250,pages=Math.max(1,Math.ceil(ids.length/size));p5Page=Math.min(p5Page,pages-1);let html=`<div class="p5-note"><button id="p5prev">‹</button> ${p5Page+1}/${pages} · ${ids.length.toLocaleString()} classes <button id="p5next">›</button></div><div class="combo-head"><div>Hand</div><div>Frequency</div><div class="num">${state.tg.evpot?'EV%':'maxEV'}</div><div class="num">${state.tg.evdiff?'EVdiff':''}</div></div><div class="combo-list">`;
+ for(const i of ids.slice(p5Page*size,(p5Page+1)*size)){const d=s.dict[i];let best=0;for(let j=1;j<s.actions.length;j++)if(s.ev(j,i)>s.ev(best,i))best=j;const a=p5Agg(s);p5Add(a,s,i,1);const title=s.actions.map((x,j)=>`${p5Label[x]}: ${(100*s.frequency(j,i)).toFixed(2)}%, EV ${s.ev(j,i).toFixed(3)}, reach ${(100*s.reach(j,i)).toFixed(2)}%`).join(' | ');html+=`<div class="combo-row" title="${title}"><div class="cards">${p5Cards(d)}</div><div class="cbar">${p5Segments(s,a)}<div class="lbl">${s.reach(0,i)===0?'—':Math.round(100*Math.max(...a.v))+'%'}</div></div><div class="num">${p5EV(s,best,i,t)}</div><div class="num ${p5Diff(s,best,i)>=0?'ev-pos':'ev-neg'}">${state.tg.evdiff?p5DiffText(p5Diff(s,best,i),t):''}</div></div>`;}combo.innerHTML=html+'</div>';combo.querySelector('#p5prev').onclick=()=>{if(p5Page>0){p5Page--;renderAll();}};combo.querySelector('#p5next').onclick=()=>{if(p5Page+1<pages){p5Page++;renderAll();}};}
+function p5RenderData(s,t){const area=document.getElementById('viewArea'),prefix=p5Prefix(),pred=state.view==='Range'?buildPredicate(state.search):null,groups=new Map(),fifthGroups=new Map(),total=p5Agg(s),selected=p5Agg(s),ids=[],filtered=[];let allW=0;const group=k=>{if(!groups.has(k))groups.set(k,p5Agg(s));return groups.get(k);};
+ for(let i=0;i<s.count;i++){const d=s.dict[i],r=d[1],w=p5Weight(s,i);allW+=w;if(!p5Filter(s,i,pred))continue;filtered.push(i);p5Add(total,s,i,w);if(state.matrixLevel&&!r.startsWith(prefix.slice(0,2).join('')))continue;const k=state.matrixLevel?r.slice(2,4)+(r[2]===r[3]?'':d[5]?'g':'b'):r.slice(0,2);p5Add(group(k),s,i,w);if(state.activeSub){if(r.slice(2,4)!==state.activeSub)continue;for(const suffix of ['',d[5]?'g':'b']){const fk=r[4]+suffix;if(!fifthGroups.has(fk))fifthGroups.set(fk,p5Agg(s));p5Add(fifthGroups.get(fk),s,i,w);}if(state.subSuited!==null&&!!d[5]!==state.subSuited)continue;if(state.p5Fifth&&r[4]!==state.p5Fifth)continue;}p5Add(selected,s,i,w);if(w>0||state.tg.zero)ids.push(i);}
+ const shown=state.view==='Range'?total:selected;document.getElementById('freqbar').innerHTML=p5Segments(s,shown,true)||'No reachable combos';document.getElementById('legend').innerHTML=p5DisplayActions(s).map(({a,j})=>`<span><i style="background:${p5Color(a)}"></i>${p5Label[a]}</span>`).join('');document.getElementById('rangeInfo').textContent=`Range: ${allW?(100*shown.w/allW).toFixed(2):'0.00'}%`;
+ if(state.view==='Range'){document.getElementById('detailTitle').textContent='Filtered range';p5List(s,filtered.filter(i=>p5Weight(s,i)>0||state.tg.zero),t);area.innerHTML='<div class="range-cols">'+p5DisplayActions(s).map(({a,j})=>{const list=filtered.filter(i=>state.tg.zero||p5Weight(s,i)>0&&s.frequency(j,i)>0);const val=i=>state.rsort.col==='freq'?s.frequency(j,i):state.rsort.col==='evdiff'?p5Diff(s,j,i):state.rsort.col==='wt'?s.reach(j,i):s.ev(j,i);list.sort((a,b)=>(val(a)-val(b))*state.rsort.dir);return `<div class="rcol ${slotOf(p5Label[a])}"><div class="rcol-head" style="background:${p5Color(a)};color:#111">${p5Label[a]} ${total.w?(100*total.v[j]/total.w).toFixed(2):'0.00'}% · ${list.length.toLocaleString()} classes</div><div class="rtable-head" style="grid-template-columns:140px 48px 1fr 1fr 1fr"><div>Hand</div><div class="rh" onclick="sortRange('freq')">Freq</div><div class="rh" onclick="sortRange('ev')">EV</div><div class="rh" onclick="sortRange('evdiff')">Diff</div><div class="rh" onclick="sortRange('wt')">Reach</div></div><div class="rlist">${list.slice(0,200).map(i=>`<div class="rrow" style="grid-template-columns:140px 48px 1fr 1fr 1fr"><div class="cards">${p5Cards(s.dict[i])}</div><div class="num">${(100*s.frequency(j,i)).toFixed(1)}%</div><div class="num">${p5EV(s,j,i,t)}</div><div class="num ${p5Diff(s,j,i)>=0?'ev-pos':'ev-neg'}">${state.tg.evdiff?p5DiffText(p5Diff(s,j,i),t):''}</div><div class="num">${(100*s.reach(j,i)).toFixed(1)}%</div></div>`).join('')}<div class="hint">Top 200 by selected sort; full filtered list at left.</div></div></div>`;}).join('')+'</div>';return;}
+ const tiles=Array.from({length:5},(_,i)=>`<span class="ctile ${prefix[i]?'fill':''}">${prefix[i]||''}</span>`).join('');area.innerHTML=`<div class="msub"><span class="ctiles">${tiles}</span></div><div class="matrix-main"><div class="grid" id="p5grid"></div><div class="suit-filter p5-filter"><div class="ttl">Suit filter:</div>${['All suits',...P5_CATS].map(x=>`<button class="sf-btn ${x==='All suits'?!state.suitBtns.size?'active':'':state.suitBtns.has(x)?'active':''}" data-p5="${x}">${x}</button>`).join('')}</div></div>`;if(state.matrixLevel&&state.topCell.hi===state.topCell.lo&&(!state.activeSub||state.activeSub===state.topCell.hi.repeat(2))){const pair=state.topCell.hi.repeat(2);const cards=area.querySelectorAll('.ctiles .ctile');for(const tile of [cards[2],cards[3]]){tile.style.cursor='pointer';tile.style.outline='1px solid #e8c345';tile.title=state.activeSub===pair?'Return to pair selection':'Select '+pair+pair+'x';tile.setAttribute('role','button');tile.tabIndex=0;const toggle=()=>{state.activeSub=state.activeSub===pair?null:pair;state.subSuited=null;state.p5Fifth=null;renderAll();};tile.onclick=toggle;tile.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();toggle();}};}}if(state.activeSub){const tile=area.querySelector('.ctiles .ctile:last-child');const last=state.activeSub[1];if(tile&&fifthGroups.has(last)){tile.style.cursor='pointer';tile.title='Toggle fifth rank '+last;tile.onclick=()=>{state.p5Fifth=state.p5Fifth===last&&state.subSuited===null?null:last;state.subSuited=null;renderAll();};}}area.querySelectorAll('[data-p5]').forEach(b=>b.onclick=()=>{state.suitBtns.clear();if(b.dataset.p5!=='All suits')state.suitBtns.add(b.dataset.p5);renderAll();});const grid=area.querySelector('#p5grid'),back=mkHdrCell(state.matrixLevel?'Back':'');if(state.matrixLevel){back.classList.add('back');back.onclick=()=>{if(state.p5Fifth)state.p5Fifth=null;else if(state.activeSub){state.activeSub=null;state.subSuited=null;}else resetSel();renderAll();};}grid.append(back);RANKS.forEach(r=>grid.append(mkHdrCell(r)));RANKS.forEach((rr,i)=>{grid.append(mkHdrCell(rr));RANKS.forEach((cc,j)=>{const a=RANKS[Math.min(i,j)],b=RANKS[Math.max(i,j)],key=a+b,want=i===j?null:i<j,g=groups.get(key+(state.matrixLevel&&want!==null?(want?'g':'b'):''));const cell=document.createElement('div');cell.className='gcell '+(i===j?'pair':'suited')+(!g?.w?' dead':'');const isTopMark=state.matrixLevel&&rr===state.topCell.hi&&cc===state.topCell.lo;if(!g?.w)cell.className='gcell dead';const seg=document.createElement('div');seg.className='segs';if(g)seg.innerHTML=p5Segments(s,g);cell.append(seg);const lab=document.createElement('span');lab.className='lab';lab.textContent=key;cell.append(lab);if(g){cell.title=`${g.n} canonical classes · `+s.actions.map((x,j)=>`${p5Label[x]} ${g.w?(100*g.v[j]/g.w).toFixed(2):'—'}%`).join(' | ');if(state.matrixLevel&&state.activeSub===key&&state.subSuited===want)cell.classList.add('active-cell');cell.onclick=()=>{if(!state.matrixLevel){state.topCell={hi:a,lo:b,pair:i===j};state.matrixLevel=1;state.activeSub=null;state.subSuited=null;state.p5Fifth=null;}else if(state.activeSub===key&&state.subSuited===want){state.activeSub=null;state.subSuited=null;state.p5Fifth=null;}else{state.activeSub=key;state.subSuited=want;state.p5Fifth=null;}renderAll();};}if(state.matrixLevel&&state.activeSub){
+ const last=state.activeSub[1],isSub=key===state.activeSub;
+ const fifthRank=rr===last&&j>=i?cc:cc===last&&i>=j?rr:null;
+ const isQuad=state.topCell.hi===state.topCell.lo&&state.activeSub===state.topCell.hi.repeat(2);
+ const fifthSuit=i===j||isQuad?null:i<j;
+ const isFifth=fifthRank!==null&&(!isSub||i===j)&&!isTopMark&&(!isQuad||i<j);
+ if(isFifth){
+  const suffix=fifthSuit===null?'':fifthSuit?'g':'b';
+  const fg=fifthGroups.get(fifthRank+suffix);
+  cell.className='gcell '+(fg?.w?'suited':'dead');
+  seg.innerHTML=fg?p5Segments(s,fg):'';lab.textContent=fifthRank;
+  cell.title=prefix.slice(0,4).join('')+fifthRank+' · '+(fifthSuit===null?'All suits':fifthSuit?'Good Suit':'Bad Suit')+(fg?' · '+s.actions.map((x,k)=>`${p5Label[x]} ${fg.w?(100*fg.v[k]/fg.w).toFixed(2):'—'}%`).join(' | '):'');
+  if(state.p5Fifth===fifthRank&&state.subSuited===fifthSuit)cell.classList.add('active-cell');
+  cell.onclick=fg?()=>{const same=state.p5Fifth===fifthRank&&state.subSuited===fifthSuit;state.subSuited=fifthSuit;state.p5Fifth=same?null:fifthRank;renderAll();}:null;
+ }else if(!isSub&&!isTopMark){cell.className='gcell dead';seg.innerHTML='';cell.onclick=null;cell.title='';}
+ if(isSub&&!isFifth){
+  const active=state.subSuited===want||(want===null&&state.activeSub[0]===state.activeSub[1]);
+  if(active)cell.classList.add('active-cell');else cell.classList.remove('active-cell');
+  cell.onclick=()=>{if(active){state.activeSub=null;state.subSuited=null;state.p5Fifth=null;}else{state.subSuited=want;}renderAll();};
+ }
+}if(isTopMark){cell.classList.add('active-cell');cell.onclick=()=>{resetSel();renderAll();};}grid.append(cell);});});document.getElementById('detailTitle').textContent=(prefix.join('')||'All')+(prefix.length===4?'x':'')+' · '+ids.length.toLocaleString()+' classes';if(state.matrixLevel)p5List(s,ids,t);else document.getElementById('comboArea').innerHTML='<div class="empty-hint">Select a matrix cell to inspect combos.</div>';}
+function renderP5(){document.getElementById('searchbar').style.display=state.view==='Range'?'flex':'none';document.getElementById('rangeToggles').style.display=state.view==='Range'?'flex':'none';document.getElementById('subviewWrap').style.display='none';if(!window.PLO5_INDEX){document.getElementById('tree').replaceChildren();showLazyMessage('Loading PLO5 index…');if(!p5Init)p5Ready().then(()=>{if(gameMode===5)renderAll();}).catch(e=>{p5Init=null;if(gameMode===5)showLazyMessage(e.message,()=>{renderAll();});});return;}const t=p5Tree();if(t.closed){showLazyMessage('此行動線已結束 — 無決策');return;}if(p5Key===t.key&&p5Spot){p5RenderData(p5Spot,t);return;}if(p5Pending===t.key)return;p5Pending=t.key;showLazyMessage('Loading PLO5 spot…');window.PLO5_LOAD(t.key).then(s=>{if(p5Trace().key===t.key&&gameMode===5){p5Key=t.key;p5Spot=s;p5RenderData(s,p5Trace());}}).catch(e=>{if(gameMode===5&&p5Trace().key===t.key)showLazyMessage(e.message,()=>{p5Pending=null;renderAll();});}).finally(()=>{if(p5Pending===t.key)p5Pending=null;});}
 
 renderAll();
 </script>
